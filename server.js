@@ -1,15 +1,18 @@
 import express from 'express';
-import xlsx from 'xlsx';
+import XLSX from 'xlsx';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const app = express();
-const port = process.env.PORT || 3001;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-app.use(cors());
+const app = express();
+const port = process.env.PORT || 3000;
+
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(cors());
+app.use(express.static(path.join(__dirname, 'public'))); // Doğru yol tanımı
 
 // Türkçe karakter dönüşümü
 const turkceLower = (text) => {
@@ -24,42 +27,53 @@ const turkceLower = (text) => {
 };
 
 // Excel dosyasını yükleme fonksiyonu
-const loadExcel = async (filePath) => {
-  const workbook = xlsx.readFile(filePath);
-  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-  const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
-  console.log('Yüklenen Veriler:', JSON.stringify(data, null, 2)); // Yüklenen verileri konsola yazdır
-  return data;
+const loadExcel = (filePath) => {
+  try {
+    const workbook = XLSX.readFile(filePath);
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(worksheet);
+    console.log(`Dosya yüklendi: ${filePath}, İlk satır:`, data[0]);
+    return data;
+  } catch (error) {
+    console.error(`Hata: ${filePath} yüklenemedi`, error);
+    return [];
+  }
 };
 
 // Arama fonksiyonu
 const kelime_arama = (data, searchText) => {
   const results = [];
-  const searchKeywords = searchText.toLowerCase().split(' ');
+  if (!searchText) return results;
 
-  data.forEach(row => {
-    const description = row[1].toString().toLowerCase();
-    if (searchKeywords.every(keyword => description.includes(keyword))) {
-      results.push(row);
-    }
-  });
-
+  const searchKeywords = turkceLower(searchText).split(' ');
+  if (searchText.match(/^\d+$/)) {
+    data.forEach(row => {
+      const kod = String(row.Kod || '');
+      if (kod.startsWith(searchText)) {
+        results.push({ Kod: row.Kod, Tanım: row.Tanım });
+      }
+    });
+  } else {
+    data.forEach(row => {
+      const description = turkceLower(String(row.Tanım || row.paragraf || row['2. Kolon'] || row.Eşya || ''));
+      if (searchKeywords.every(keyword => description.includes(keyword))) {
+        results.push(row);
+      }
+    });
+  }
   return results;
 };
 
-// Excel dosyalarını yükle (config.ini’deki isimlerle)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const gtipData = await loadExcel(path.join(__dirname, 'test.xlsx'));
-const izahnameData = await loadExcel(path.join(__dirname, 'izahname.xlsx'));
-const tarifeData = await loadExcel(path.join(__dirname, 'index.xlsx'));
-const esyaFihristiData = await loadExcel(path.join(__dirname, 'alfabetik_fihrist.xlsx'));
+// Excel dosyalarını yükle
+const gtipData = loadExcel(path.join(__dirname, 'gtip.xls'));
+const izahnameData = loadExcel(path.join(__dirname, 'izahname.xlsx'));
+const tarifeData = loadExcel(path.join(__dirname, 'index.xlsx'));
+const esyaFihristiData = loadExcel(path.join(__dirname, 'alfabetik_fihrist.xlsx'));
 
 // GTİP Arama
 app.get('/api/gtip/search', (req, res) => {
   const { query } = req.query;
   if (!query) return res.status(400).json({ error: 'Arama metni gereklidir' });
-
   const results = kelime_arama(gtipData, query);
   res.json(results);
 });
@@ -68,8 +82,10 @@ app.get('/api/gtip/search', (req, res) => {
 app.get('/api/izahname/search', (req, res) => {
   const { query } = req.query;
   if (!query) return res.status(400).json({ error: 'Arama metni gereklidir' });
-
-  const results = kelime_arama(izahnameData, query);
+  const results = kelime_arama(izahnameData, query).map(row => ({
+    index: row.index,
+    paragraph: row.paragraf
+  }));
   res.json(results);
 });
 
@@ -77,8 +93,10 @@ app.get('/api/izahname/search', (req, res) => {
 app.get('/api/tarife/search', (req, res) => {
   const { query } = req.query;
   if (!query) return res.status(400).json({ error: 'Arama metni gereklidir' });
-
-  const results = kelime_arama(tarifeData, query);
+  const results = kelime_arama(tarifeData, query).map(row => ({
+    col1: row['1. Kolon'],
+    col2: row['2. Kolon']
+  }));
   res.json(results);
 });
 
@@ -86,8 +104,11 @@ app.get('/api/tarife/search', (req, res) => {
 app.get('/api/esya-fihristi/search', (req, res) => {
   const { query } = req.query;
   if (!query) return res.status(400).json({ error: 'Arama metni gereklidir' });
-
-  const results = kelime_arama(esyaFihristiData, query);
+  const results = kelime_arama(esyaFihristiData, query).map(row => ({
+    esya: row.Eşya,
+    armonize: row['Armonize Sistem'],
+    notlar: row['İzahname Notları']
+  }));
   res.json(results);
 });
 
@@ -95,34 +116,21 @@ app.get('/api/esya-fihristi/search', (req, res) => {
 app.get('/api/izahname/context', (req, res) => {
   const { index } = req.query;
   const actualIndex = parseInt(index);
+  if (isNaN(actualIndex)) return res.status(400).json({ error: 'Geçersiz indeks' });
+
   const startIndex = Math.max(0, actualIndex - 25);
   const endIndex = Math.min(izahnameData.length - 1, actualIndex + 25);
   const results = izahnameData
     .slice(startIndex, endIndex + 1)
-    .map((row, i) => ({ index: startIndex + i, paragraph: row[0], isBold: startIndex + i === actualIndex }));
+    .map((row, i) => ({
+      index: startIndex + i,
+      paragraph: row.paragraf,
+      isBold: startIndex + i === actualIndex
+    }));
   res.json(results);
 });
 
-// Excel Search API Endpoints
-const loadExcelFile = (filePath) => {
-  const workbook = xlsx.readFile(filePath);
-  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-  return xlsx.utils.sheet_to_json(worksheet);
-};
-
-const gtipExcelData = loadExcelFile('path/to/your/gtip.xlsx');
-
-app.get('/api/gtip/excel/search', (req, res) => {
-  const { query } = req.query;
-  const results = gtipExcelData.filter(item => item.Kod.includes(query) || item.Tanım.toLowerCase().includes(query.toLowerCase()));
-  res.json(results);
-});
-
-// Serve React app
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
+// Sunucuyu başlat
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
