@@ -74,6 +74,11 @@ const esyaFihristiData = loadExcel(path.join(__dirname, 'alfabetik_fihrist.xlsx'
 app.get('/api/gtip/search', (req, res) => {
   const { query } = req.query;
   if (!query) return res.status(400).json({ error: 'Arama metni gereklidir' });
+  
+  // Hata ayıklama için konsola yazdırma
+  console.log('Arama metni:', query);
+  console.log('GTİP verisi:', gtipData);
+
   const results = kelime_arama(gtipData, query);
   res.json(results);
 });
@@ -82,6 +87,10 @@ app.get('/api/gtip/search', (req, res) => {
 app.get('/api/izahname/search', (req, res) => {
   const { query } = req.query;
   if (!query) return res.status(400).json({ error: 'Arama metni gereklidir' });
+
+  console.log('Arama metni:', query);
+  console.log('İzahname verisi:', izahnameData);
+
   const results = kelime_arama(izahnameData, query).map(row => ({
     index: row.index,
     paragraph: row.paragraf
@@ -93,6 +102,10 @@ app.get('/api/izahname/search', (req, res) => {
 app.get('/api/tarife/search', (req, res) => {
   const { query } = req.query;
   if (!query) return res.status(400).json({ error: 'Arama metni gereklidir' });
+
+  console.log('Arama metni:', query);
+  console.log('Tarife verisi:', tarifeData);
+
   const results = kelime_arama(tarifeData, query).map(row => ({
     col1: row['1. Kolon'],
     col2: row['2. Kolon']
@@ -104,6 +117,10 @@ app.get('/api/tarife/search', (req, res) => {
 app.get('/api/esya-fihristi/search', (req, res) => {
   const { query } = req.query;
   if (!query) return res.status(400).json({ error: 'Arama metni gereklidir' });
+
+  console.log('Arama metni:', query);
+  console.log('Eşya Fihristi verisi:', esyaFihristiData);
+
   const results = kelime_arama(esyaFihristiData, query).map(row => ({
     esya: row.Eşya,
     armonize: row['Armonize Sistem'],

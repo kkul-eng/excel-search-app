@@ -4,12 +4,135 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Arama Uygulaması</title>
+  <style>
+    body {
+      background-color: #f0f0f0;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+    }
+    .tabs {
+      display: flex;
+      justify-content: flex-start; /* Butonları sola yanaştır */
+      margin-bottom: 20px;
+    }
+    .tab {
+      padding: 10px 20px;
+      background-color: #3498db;
+      color: white;
+      border: none;
+      border-radius: 5px 5px 0 0;
+      cursor: pointer;
+      margin: 0 5px;
+    }
+    .tab.active {
+      background-color: #2980b9;
+    }
+    .tab-content {
+      display: none;
+      background-color: white;
+      border: 2px solid #3498db;
+      border-radius: 0 0 5px 5px;
+      padding: 20px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .search-container {
+      display: flex;
+      justify-content: center; /* Input ve butonları ortala */
+      margin-bottom: 20px;
+    }
+    input[type="text"] {
+      padding: 10px;
+      width: 300px;
+      border: 2px solid #3498db;
+      border-radius: 5px;
+      margin-right: 10px; /* Buton ile araya boşluk ekle */
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #3498db;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+  </style>
 </head>
 <body>
-  <div id="root"></div>
+  <h1>Arama Uygulaması</h1>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('gtip')">GTİP Arama</button>
+    <button class="tab" onclick="showTab('izahname')">İzahname Arama</button>
+    <button class="tab" onclick="showTab('tarife')">Tarife Cetveli Arama</button>
+    <button class="tab" onclick="showTab('esya')">Eşya Fihristi</button>
+  </div>
+  
+  <div id="gtip" class="tab-content active">
+    <h2>GTİP Arama</h2>
+    <div class="search-container">
+      <input type="text" id="searchInputGtip" placeholder="GTİP kodu girin...">
+      <button id="searchButtonGtip">Ara</button>
+    </div>
+    <ul id="resultsListGtip"></ul>
+  </div>
+  
+  <div id="izahname" class="tab-content">
+    <h2>İzahname Arama</h2>
+    <div class="search-container">
+      <input type="text" id="searchInputIzahname" placeholder="İzahname kelimesi girin...">
+      <button id="searchButtonIzahname">Ara</button>
+    </div>
+    <ul id="resultsListIzahname"></ul>
+  </div>
+  
+  <div id="tarife" class="tab-content">
+    <h2>Tarife Cetveli Arama</h2>
+    <div class="search-container">
+      <input type="text" id="searchInputTarife" placeholder="Tarife kelimesi girin...">
+      <button id="searchButtonTarife">Ara</button>
+    </div>
+    <ul id="resultsListTarife"></ul>
+  </div>
+  
+  <div id="esya" class="tab-content">
+    <h2>Eşya Fihristi</h2>
+    <div class="search-container">
+      <input type="text" id="searchInputEsya" placeholder="Eşya kelimesi girin...">
+      <button id="searchButtonEsya">Ara</button>
+    </div>
+    <ul id="resultsListEsya"></ul>
+  </div>
+
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <script src="/src/App.js"></script>
+
+  <script>
+    function showTab(tabId) {
+      const tabs = document.querySelectorAll('.tab-content');
+      const tabButtons = document.querySelectorAll('.tab');
+
+      tabs.forEach(tab => {
+        tab.classList.remove('active');
+      });
+      tabButtons.forEach(button => {
+        button.classList.remove('active');
+      });
+
+      document.getElementById(tabId).classList.add('active');
+      document.querySelector(`.tab[onclick="showTab('${tabId}')"]`).classList.add('active');
+    }
+  </script>
 </body>
 </html>
