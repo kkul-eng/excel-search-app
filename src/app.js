@@ -10,23 +10,31 @@ function App() {
   const [showDetail, setShowDetail] = useState(false);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
 
-  // Arama fonksiyonu (Tek bir fonksiyon üzerinden API çağrıları)
+  // Arama fonksiyonu
   const search = async () => {
-    if (!query) return;
+    if (!query) {
+      alert('Lütfen bir arama terimi girin.');
+      return;
+    }
     try {
-      const response = await axios.get(`/api/${activeTab}/search`, { params: { query } });
+      const response = await axios.get(`https://excel-search-app-6.onrender.com/api/${activeTab}/search`, {
+        params: { query },
+      });
       setResults(response.data);
       setCurrentMatchIndex(['tarife', 'esya-fihristi'].includes(activeTab) ? 0 : -1);
       setShowDetail(false);
     } catch (error) {
       console.error('Arama hatası:', error);
+      alert('Arama sırasında bir hata oluştu.');
     }
   };
 
-  // Detay verisini çekme fonksiyonu
+  // Detay verisini çekme
   const fetchDetail = async (index) => {
     try {
-      const response = await axios.get('/api/izahname/context', { params: { index } });
+      const response = await axios.get('https://excel-search-app-6.onrender.com/api/izahname/context', {
+        params: { index },
+      });
       setDetailResults(response.data);
       setShowDetail(true);
     } catch (error) {
@@ -34,21 +42,20 @@ function App() {
     }
   };
 
-  // Bir sonraki eşleşmeye geçme
+  // Navigation fonksiyonları
   const nextMatch = () => {
     if (results.length > 0) {
       setCurrentMatchIndex((prev) => (prev + 1) % results.length);
     }
   };
 
-  // Önceki eşleşmeye dönme
   const previousMatch = () => {
     if (results.length > 0) {
       setCurrentMatchIndex((prev) => (prev - 1 + results.length) % results.length);
     }
   };
 
-  // Sekme değiştirildiğinde state'i sıfırlayan fonksiyon
+  // Sekme değiştirme
   const resetState = (tabId) => {
     setActiveTab(tabId);
     setResults([]);
@@ -57,7 +64,6 @@ function App() {
     setCurrentMatchIndex(-1);
   };
 
-  // Sekme bilgileri
   const tabs = [
     { id: 'gtip', name: 'GTİP Arama', label: 'Aradığınız GTİP kodu veya kelimeleri girin:' },
     { id: 'izahname', name: 'İzahname Arama', label: 'Aranacak kelime veya kelimeleri girin:' },
@@ -65,13 +71,12 @@ function App() {
     { id: 'esya-fihristi', name: 'Eşya Fihristi', label: 'Aranacak kelime veya rakamı girin:' },
   ];
 
-  const activeTabData = tabs.find(tab => tab.id === activeTab);
+  const activeTabData = tabs.find((tab) => tab.id === activeTab);
 
   return (
     <div className="app">
-      {/* Sekme Seçenekleri */}
       <div className="tabs">
-        {tabs.map(tab => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             className={`tab ${activeTab === tab.id ? 'active' : ''}`}
@@ -82,7 +87,6 @@ function App() {
         ))}
       </div>
 
-      {/* İçerik Bölümü */}
       <div className="content">
         <h1>{activeTabData.name}</h1>
         <label>{activeTabData.label}</label>
@@ -96,7 +100,6 @@ function App() {
           <button onClick={search}>Ara</button>
         </div>
 
-        {/* Önceki / Sonraki Butonları (Tarife & Eşya için) */}
         {['tarife', 'esya-fihristi'].includes(activeTab) && results.length > 0 && (
           <div className="nav-buttons">
             <button onClick={previousMatch}>◄</button>
@@ -104,7 +107,6 @@ function App() {
           </div>
         )}
 
-        {/* Detay Görünümü */}
         {showDetail ? (
           <div className="results">
             <h2>İzahname Detay</h2>
@@ -117,26 +119,60 @@ function App() {
           </div>
         ) : (
           <div className="results">
-            {/* GTİP Tablosu */}
-            {activeTab === 'gtip' && (
+            {activeTab === 'gtip' && results.length > 0 && (
               <table className="treeview">
-                <thead><tr><th>Kod</th><th>Tanım</th></tr></thead>
-                <tbody>{results.map((r, i) => <tr key={i}><td>{r.Kod}</td><td>{r.Tanım}</td></tr>)}</tbody>
+                <thead>
+                  <tr>
+                    <th>Kod</th>
+                    <th>Tanım</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((r, i) => (
+                    <tr key={i}>
+                      <td>{r.Kod}</td>
+                      <td>{r.Tanım}</td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             )}
 
-            {/* İzahname Sonuçları */}
-            {activeTab === 'izahname' && results.map((r, i) => (
-              <p key={i} onClick={() => fetchDetail(r.index)}>{r.paragraph} <span className="detail-link">Detay...</span></p>
-            ))}
+            {activeTab === 'izahname' && results.length > 0 && (
+              <div className="izahname-results">
+                {results.map((r, i) => (
+                  <div key={i} className="izahname-result">
+                    {r.paragraph}{' '}
+                    <span className="detail-link" onClick={() => fetchDetail(r.index)}>
+                      Detay...
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
-            {/* Tarife & Eşya Tablosu */}
-            {['tarife', 'esya-fihristi'].includes(activeTab) && (
+            {['tarife', 'esya-fihristi'].includes(activeTab) && results.length > 0 && (
               <table className="treeview">
-                <thead><tr><th>1. Kolon</th><th>2. Kolon</th></tr></thead>
-                <tbody>{results.map((r, i) => <tr key={i} className={i === currentMatchIndex ? 'highlight' : ''}><td>{r.col1}</td><td>{r.col2}</td></tr>)}</tbody>
+                <thead>
+                  <tr>
+                    <th>{activeTab === 'tarife' ? '1. Kolon' : 'Eşya'}</th>
+                    <th>{activeTab === 'tarife' ? '2. Kolon' : 'Armonize Sistem'}</th>
+                    {activeTab === 'esya-fihristi' && <th>İzahname Notları</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((r, i) => (
+                    <tr key={i} className={i === currentMatchIndex ? 'highlight' : ''}>
+                      <td>{r.col1 || r.esya}</td>
+                      <td>{r.col2 || r.armonize}</td>
+                      {activeTab === 'esya-fihristi' && <td>{r.notlar}</td>}
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             )}
+
+            {results.length === 0 && query && <p>Eşleşme bulunamadı.</p>}
           </div>
         )}
       </div>

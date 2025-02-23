@@ -175,6 +175,10 @@
       background-color: #2980b9;
       color: white;
     }
+    .error {
+      color: red;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -238,6 +242,13 @@
 
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <script>
+    // Dinamik base URL belirleme
+    const getBaseUrl = () => {
+      return window.location.hostname === 'localhost' 
+        ? 'http://localhost:3001' 
+        : 'https://excel-search-app-6.onrender.com';
+    };
+
     function showTab(tabId) {
       const tabs = document.querySelectorAll('.tab-content');
       const tabButtons = document.querySelectorAll('.tab');
@@ -245,8 +256,10 @@
       tabs.forEach(tab => tab.classList.remove('active'));
       tabButtons.forEach(button => button.classList.remove('active'));
 
-      document.getElementById(tabId).classList.add('active');
-      document.querySelector(`.tab[onclick="showTab('${tabId}')"]`).classList.add('active');
+      const tab = document.getElementById(tabId);
+      if (tab) tab.classList.add('active');
+      const button = document.querySelector(`.tab[onclick="showTab('${tabId}')"]`);
+      if (button) button.classList.add('active');
     }
 
     let currentMatches = {
@@ -255,25 +268,39 @@
     };
 
     async function searchData(endpoint) {
-      const query = document.getElementById(`searchInput${endpoint.charAt(0).toUpperCase() + endpoint.slice(1)}`).value;
+      const input = document.getElementById(`searchInput${endpoint.charAt(0).toUpperCase() + endpoint.slice(1)}`);
+      const resultsDiv = document.getElementById(`resultsList${endpoint.charAt(0).toUpperCase() + endpoint.slice(1)}`);
+      if (!input || !resultsDiv) {
+        console.error(`${endpoint} için gerekli DOM elemanları bulunamadı.`);
+        return;
+      }
+
+      const query = input.value.trim();
       if (!query) {
-        alert('Lütfen geçerli bir arama terimi girin.');
+        resultsDiv.innerHTML = '<p class="error">Lütfen geçerli bir arama terimi girin.</p>';
         return;
       }
 
       try {
-        const response = await axios.get(`/api/${endpoint}/search`, { params: { query } });
+        const response = await axios.get(`${getBaseUrl()}/api/${endpoint}/search`, { 
+          params: { query: encodeURIComponent(query) } 
+        });
         const results = response.data;
         displayResults(endpoint, results);
-        currentMatches[endpoint] = 0; // Arama sonrası ilk eşleşmeye sıfırla
+        if (endpoint === 'tarife' || endpoint === 'esya') {
+          currentMatches[endpoint] = 0; // Arama sonrası ilk eşleşmeye sıfırla
+          highlightMatch(endpoint);
+        }
       } catch (error) {
         console.error(`Arama hatası (${endpoint}):`, error);
-        alert(`Arama sırasında bir hata oluştu: ${error.message}`);
+        resultsDiv.innerHTML = `<p class="error">Arama sırasında bir hata oluştu: ${error.message}</p>`;
       }
     }
 
     function displayResults(endpoint, results) {
       const resultsDiv = document.getElementById(`resultsList${endpoint.charAt(0).toUpperCase() + endpoint.slice(1)}`);
+      if (!resultsDiv) return;
+
       resultsDiv.innerHTML = '';
 
       if (endpoint === 'gtip') {
@@ -293,11 +320,13 @@
           resultsDiv.innerHTML = '<p>Eşleşme bulunamadı.</p>';
           return;
         }
+        const ul = document.createElement('ul');
         results.forEach(r => {
           const li = document.createElement('li');
           li.innerHTML = `${r.paragraph || ''} <span class="detail-link" onclick="showDetail('${r.index}')">Detay...</span>`;
-          resultsDiv.appendChild(li);
+          ul.appendChild(li);
         });
+        resultsDiv.appendChild(ul);
       } else if (endpoint === 'tarife' || endpoint === 'esya') {
         if (results.length === 0) {
           resultsDiv.innerHTML = '<p>Eşleşme bulunamadı.</p>';
@@ -314,32 +343,45 @@
           <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
           <tbody>${rows.join('')}</tbody>
         `;
-        resultsDiv.insertBefore(table, resultsDiv.firstChild);
+        resultsDiv.insertBefore(table, resultsDiv.querySelector('.nav-buttons'));
       }
     }
 
     async function showDetail(index) {
+      const resultsDiv = document.getElementById('resultsListIzahname');
+      if (!resultsDiv) return;
+
       try {
-        const response = await axios.get('/api/izahname/context', { params: { index } });
+        const response = await axios.get(`${getBaseUrl()}/api/izahname/context`, { 
+          params: { index } 
+        });
         const results = response.data;
-        const resultsDiv = document.getElementById('resultsListIzahname');
-        resultsDiv.innerHTML = '<h2>İzahname Detay</h2>' + results.map(r => `<p class="${r.isBold ? 'bold' : ''}">${r.paragraph || ''}</p>`).join('') + '<button onclick="hideDetail()">Geri Dön</button>';
-      } function hideDetail() {
-        showTab('izahname');
-        searchData('izahname'); // Önceki arama sonuçlarını yenile
+        resultsDiv.innerHTML = '<h2>İzahname Detay</h2>' + 
+          results.map(r => `<p class="${r.isBold ? 'bold' : ''}">${r.paragraph || ''}</p>`).join('') + 
+          '<button onclick="hideDetail()">Geri Dön</button>';
+      } catch (error) {
+        console.error('Detay hatası:', error);
+        resultsDiv.innerHTML = `<p class="error">Detay yüklenirken hata oluştu: ${error.message}</p>`;
       }
     }
 
+    function hideDetail() {
+      showTab('izahname');
+      searchData('izahname'); // Önceki arama sonuçlarını yenile
+    }
+
     function previousMatch(endpoint) {
-      if (currentMatches[endpoint] > -1) {
-        currentMatches[endpoint] = (currentMatches[endpoint] - 1 + document.querySelectorAll(`#resultsList${endpoint.charAt(0).toUpperCase() + endpoint.slice(1)} table.treeview tbody tr`).length) % document.querySelectorAll(`#resultsList${endpoint.charAt(0).toUpperCase() + endpoint.slice(1)} table.treeview tbody tr`).length;
+      const rows = document.querySelectorAll(`#resultsList${endpoint.charAt(0).toUpperCase() + endpoint.slice(1)} table.treeview tbody tr`);
+      if (rows.length > 0 && currentMatches[endpoint] > -1) {
+        currentMatches[endpoint] = (currentMatches[endpoint] - 1 + rows.length) % rows.length;
         highlightMatch(endpoint);
       }
     }
 
     function nextMatch(endpoint) {
-      if (currentMatches[endpoint] > -1) {
-        currentMatches[endpoint] = (currentMatches[endpoint] + 1) % document.querySelectorAll(`#resultsList${endpoint.charAt(0).toUpperCase() + endpoint.slice(1)} table.treeview tbody tr`).length;
+      const rows = document.querySelectorAll(`#resultsList${endpoint.charAt(0).toUpperCase() + endpoint.slice(1)} table.treeview tbody tr`);
+      if (rows.length > 0 && currentMatches[endpoint] > -1) {
+        currentMatches[endpoint] = (currentMatches[endpoint] + 1) % rows.length;
         highlightMatch(endpoint);
       }
     }
@@ -352,6 +394,16 @@
         rows[currentMatches[endpoint]].scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
+
+    // Enter tuşu ile arama desteği
+    document.querySelectorAll('input[type="text"]').forEach(input => {
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          const endpoint = input.id.replace('searchInput', '').toLowerCase();
+          searchData(endpoint);
+        }
+      });
+    });
   </script>
 </body>
 </html>
