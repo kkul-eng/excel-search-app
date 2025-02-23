@@ -6,13 +6,27 @@ function App() {
   const [activeTab, setActiveTab] = useState('gtip');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
+  const [searchResultsIndices, setSearchResultsIndices] = useState([]);
   const [detailResults, setDetailResults] = useState([]);
   const [showDetail, setShowDetail] = useState(false);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
 
+  // Turkish lowercase conversion
+  const turkceLower = (text) => {
+    const turkceKarakterler = {
+      'İ': 'i', 'I': 'ı', 'Ş': 'ş', 'Ğ': 'ğ',
+      'Ü': 'ü', 'Ö': 'ö', 'Ç': 'ç'
+    };
+    let result = text;
+    for (const [upper, lower] of Object.entries(turkceKarakterler)) {
+      result = result.replace(new RegExp(upper, 'g'), lower);
+    }
+    return result.toLowerCase();
+  };
+
   // Arama fonksiyonu
   const search = async () => {
-    if (!query) {
+    if (!query.trim()) {
       alert('Lütfen bir arama terimi girin.');
       return;
     }
@@ -20,9 +34,64 @@ function App() {
       const response = await axios.get(`https://excel-search-app-6.onrender.com/api/${activeTab}/search`, {
         params: { query },
       });
-      setResults(response.data);
-      setCurrentMatchIndex(['tarife', 'esya-fihristi'].includes(activeTab) ? 0 : -1);
-      setShowDetail(false);
+      const data = response.data;
+
+      if (activeTab === 'gtip') {
+        const searchText = turkceLower(query.trim());
+        const filteredResults = data.filter(row => {
+          if (/^\d+$/.test(searchText)) {
+            return row.Kod.startsWith(searchText);
+          } else {
+            const keywords = searchText.split(' ');
+            const description = turkceLower(row.Tanım);
+            return keywords.every(keyword => description.includes(keyword));
+          }
+        });
+        setResults(filteredResults);
+        setSearchResultsIndices([]);
+        setCurrentMatchIndex(-1);
+        setShowDetail(false);
+      } else if (activeTab === 'izahname') {
+        const searchText = turkceLower(query.trim());
+        const keywords = searchText.split(' ');
+        const filteredResults = data.filter(row => {
+          const paragraph = turkceLower(row.paragraph);
+          return keywords.every(keyword => paragraph.includes(keyword));
+        });
+        setResults(filteredResults);
+        setSearchResultsIndices([]);
+        setCurrentMatchIndex(-1);
+        setShowDetail(false);
+      } else if (activeTab === 'tarife') {
+        const searchText = turkceLower(query.trim());
+        const matchedIndices = data.reduce((acc, row, index) => {
+          const col1 = turkceLower(row.col1 || '');
+          const col2 = turkceLower(row.col2 || '');
+          if (col1.includes(searchText) || col2.includes(searchText)) {
+            acc.push(index);
+          }
+          return acc;
+        }, []);
+        setResults(data);
+        setSearchResultsIndices(matchedIndices);
+        setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
+        setShowDetail(false);
+      } else if (activeTab === 'esya-fihristi') {
+        const searchText = turkceLower(query.trim());
+        const matchedIndices = data.reduce((acc, row, index) => {
+          const esya = turkceLower(row.esya || '');
+          const armonize = turkceLower(row.armonize || '');
+          const notlar = turkceLower(row.notlar || '');
+          if (esya.includes(searchText) || armonize.includes(searchText) || notlar.includes(searchText)) {
+            acc.push(index);
+          }
+          return acc;
+        }, []);
+        setResults(data);
+        setSearchResultsIndices(matchedIndices);
+        setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
+        setShowDetail(false);
+      }
     } catch (error) {
       console.error('Arama hatası:', error);
       alert('Arama sırasında bir hata oluştu.');
@@ -44,14 +113,14 @@ function App() {
 
   // Navigation fonksiyonları
   const nextMatch = () => {
-    if (results.length > 0) {
-      setCurrentMatchIndex((prev) => (prev + 1) % results.length);
+    if (searchResultsIndices.length > 0) {
+      setCurrentMatchIndex((prev) => (prev + 1) % searchResultsIndices.length);
     }
   };
 
   const previousMatch = () => {
-    if (results.length > 0) {
-      setCurrentMatchIndex((prev) => (prev - 1 + results.length) % results.length);
+    if (searchResultsIndices.length > 0) {
+      setCurrentMatchIndex((prev) => (prev - 1 + searchResultsIndices.length) % searchResultsIndices.length);
     }
   };
 
@@ -59,6 +128,7 @@ function App() {
   const resetState = (tabId) => {
     setActiveTab(tabId);
     setResults([]);
+    setSearchResultsIndices([]);
     setQuery('');
     setShowDetail(false);
     setCurrentMatchIndex(-1);
@@ -100,7 +170,7 @@ function App() {
           <button onClick={search}>Ara</button>
         </div>
 
-        {['tarife', 'esya-fihristi'].includes(activeTab) && results.length > 0 && (
+        {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 0 && (
           <div className="nav-buttons">
             <button onClick={previousMatch}>◄</button>
             <button onClick={nextMatch}>►</button>
@@ -162,7 +232,10 @@ function App() {
                 </thead>
                 <tbody>
                   {results.map((r, i) => (
-                    <tr key={i} className={i === currentMatchIndex ? 'highlight' : ''}>
+                    <tr
+                      key={i}
+                      className={searchResultsIndices[currentMatchIndex] === i ? 'highlight' : ''}
+                    >
                       <td>{r.col1 || r.esya}</td>
                       <td>{r.col2 || r.armonize}</td>
                       {activeTab === 'esya-fihristi' && <td>{r.notlar}</td>}
@@ -172,7 +245,9 @@ function App() {
               </table>
             )}
 
-            {results.length === 0 && query && <p>Eşleşme bulunamadı.</p>}
+            {(results.length === 0 || (['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length === 0)) && query && (
+              <p>Eşleşme bulunamadı.</p>
+            )}
           </div>
         )}
       </div>
