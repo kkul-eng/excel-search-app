@@ -10,61 +10,170 @@
       font-family: Arial, sans-serif;
       margin: 0;
       padding: 20px;
+      min-height: 100vh;
     }
     h1 {
+      font-size: 26px;
+      font-weight: bold;
       color: #2c3e50;
       text-align: center;
+      padding: 20px 0;
+      margin: 0;
     }
     .tabs {
       display: flex;
-      justify-content: flex-start; /* Butonları sola yanaştır */
-      margin-bottom: 20px;
+      justify-content: center;
+      margin-bottom: 0;
+      width: 100%;
+      max-width: 1200px;
+      background-color: #f0f0f0;
+      border-bottom: 2px solid #3498db;
     }
     .tab {
-      padding: 10px 20px;
-      background-color: #3498db;
-      color: white;
-      border: none;
-      border-radius: 5px 5px 0 0;
-      cursor: pointer;
+      padding: 10px 30px;
+      background-color: #f0f0f0;
+      color: #3498db;
+      border: 1px solid #3498db;
+      border-radius: 0;
+      font-size: 14px;
+      font-weight: bold;
       margin: 0 5px;
+      cursor: pointer;
+      border-top-left-radius: 5px;
+      border-top-right-radius: 5px;
+      transition: all 0.3s;
     }
     .tab.active {
+      background-color: #3498db;
+      color: white;
+      border-bottom: none;
+    }
+    .tab:hover:not(.active) {
       background-color: #2980b9;
+      color: white;
     }
     .tab-content {
       display: none;
-      background-color: white;
+      background-color: #ffffff;
       border: 2px solid #3498db;
       border-radius: 0 0 5px 5px;
       padding: 20px;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
     }
     .tab-content.active {
       display: block;
     }
+    h2 {
+      font-size: 26px;
+      font-weight: bold;
+      color: #2c3e50;
+      margin: 0 0 20px;
+    }
+    label {
+      font-size: 16px;
+      color: #2c3e50;
+      display: block;
+      margin: 20px 0 10px;
+      text-align: left;
+      padding-left: 20px;
+    }
     .search-container {
       display: flex;
-      justify-content: center; /* Input ve butonları ortala */
+      justify-content: center;
       margin-bottom: 20px;
+      padding-left: 20px;
+      padding-right: 20px;
     }
     input[type="text"] {
       padding: 10px;
-      width: 300px;
-      border: 2px solid #3498db;
+      width: 350px;
+      font-size: 18px;
+      border: 2px solid #ccc;
       border-radius: 5px;
-      margin-right: 10px; /* Buton ile araya boşluk ekle */
+      margin-right: 10px;
     }
     button {
+      padding: 10px 40px;
+      background-color: #3498db;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    .nav-buttons {
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+    .nav-buttons button {
       padding: 10px 20px;
       background-color: #3498db;
       color: white;
       border: none;
       border-radius: 5px;
+      font-size: 14px;
+      font-weight: bold;
       cursor: pointer;
     }
-    button:hover {
+    .nav-buttons button:hover {
       background-color: #2980b9;
+    }
+    .results {
+      padding: 20px;
+      overflow-x: auto;
+      width: 100%;
+    }
+    .results ul {
+      list-style: none;
+      padding: 0;
+    }
+    .results li {
+      margin-bottom: 10px;
+      padding: 10px;
+      background-color: #ffffff;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    .detail-link {
+      color: blue;
+      cursor: pointer;
+    }
+    .detail-link:hover {
+      text-decoration: underline;
+    }
+    .bold {
+      font-weight: bold;
+    }
+    table.treeview {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table.treeview th, table.treeview td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+      font-size: 14px;
+      color: #2c3e50;
+    }
+    table.treeview th {
+      background-color: #3498db;
+      color: white;
+      font-weight: bold;
+      font-size: 16px;
+      padding: 10px 5px;
+    }
+    table.treeview tr.highlight {
+      background-color: #2980b9;
+      color: white;
     }
   </style>
 </head>
@@ -76,62 +185,172 @@
     <button class="tab" onclick="showTab('tarife')">Tarife Cetveli Arama</button>
     <button class="tab" onclick="showTab('esya')">Eşya Fihristi</button>
   </div>
-  
+
   <div id="gtip" class="tab-content active">
     <h2>GTİP Arama</h2>
+    <label>Aradığınız GTİP kodu veya kısaltılmış kelimeleri girin:</label>
     <div class="search-container">
-      <input type="text" id="searchInputGtip" placeholder="GTİP kodu girin...">
-      <button id="searchButtonGtip">Ara</button>
+      <input type="text" id="searchInputGtip" placeholder="Arama yapın...">
+      <button id="searchButtonGtip" onclick="searchData('gtip')">Ara</button>
     </div>
-    <ul id="resultsListGtip"></ul>
+    <div id="resultsListGtip" class="results"></div>
   </div>
-  
+
   <div id="izahname" class="tab-content">
     <h2>İzahname Arama</h2>
+    <label>Aranacak kelime veya kelimeleri girin:</label>
     <div class="search-container">
-      <input type="text" id="searchInputIzahname" placeholder="İzahname kelimesi girin...">
-      <button id="searchButtonIzahname">Ara</button>
+      <input type="text" id="searchInputIzahname" placeholder="Arama yapın...">
+      <button id="searchButtonIzahname" onclick="searchData('izahname')">Ara</button>
     </div>
-    <ul id="resultsListIzahname"></ul>
+    <div id="resultsListIzahname" class="results"></div>
   </div>
-  
+
   <div id="tarife" class="tab-content">
     <h2>Tarife Cetveli Arama</h2>
+    <label>Aranacak kelime veya rakamı girin:</label>
     <div class="search-container">
-      <input type="text" id="searchInputTarife" placeholder="Tarife kelimesi girin...">
-      <button id="searchButtonTarife">Ara</button>
+      <input type="text" id="searchInputTarife" placeholder="Arama yapın...">
+      <button id="searchButtonTarife" onclick="searchData('tarife')">Ara</button>
     </div>
-    <ul id="resultsListTarife"></ul>
+    <div id="resultsListTarife" class="results">
+      <div class="nav-buttons">
+        <button onclick="previousMatch('tarife')">◄</button>
+        <button onclick="nextMatch('tarife')">►</button>
+      </div>
+    </div>
   </div>
-  
+
   <div id="esya" class="tab-content">
     <h2>Eşya Fihristi</h2>
+    <label>Aranacak kelime veya rakamı girin:</label>
     <div class="search-container">
-      <input type="text" id="searchInputEsya" placeholder="Eşya kelimesi girin...">
-      <button id="searchButtonEsya">Ara</button>
+      <input type="text" id="searchInputEsya" placeholder="Arama yapın...">
+      <button id="searchButtonEsya" onclick="searchData('esya')">Ara</button>
     </div>
-    <ul id="resultsListEsya"></ul>
+    <div id="resultsListEsya" class="results">
+      <div class="nav-buttons">
+        <button onclick="previousMatch('esya')">◄</button>
+        <button onclick="nextMatch('esya')">►</button>
+      </div>
+    </div>
   </div>
 
-  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
-  <script src="/src/App.js"></script>
-
   <script>
     function showTab(tabId) {
       const tabs = document.querySelectorAll('.tab-content');
       const tabButtons = document.querySelectorAll('.tab');
 
-      tabs.forEach(tab => {
-        tab.classList.remove('active');
-      });
-      tabButtons.forEach(button => {
-        button.classList.remove('active');
-      });
+      tabs.forEach(tab => tab.classList.remove('active'));
+      tabButtons.forEach(button => button.classList.remove('active'));
 
       document.getElementById(tabId).classList.add('active');
       document.querySelector(`.tab[onclick="showTab('${tabId}')"]`).classList.add('active');
+    }
+
+    let currentMatches = {
+      tarife: -1,
+      esya: -1
+    };
+
+    async function searchData(endpoint) {
+      const query = document.getElementById(`searchInput${endpoint.charAt(0).toUpperCase() + endpoint.slice(1)}`).value;
+      if (!query) {
+        alert('Lütfen geçerli bir arama terimi girin.');
+        return;
+      }
+
+      try {
+        const response = await axios.get(`/api/${endpoint}/search`, { params: { query } });
+        const results = response.data;
+        displayResults(endpoint, results);
+        currentMatches[endpoint] = 0; // Arama sonrası ilk eşleşmeye sıfırla
+      } catch (error) {
+        console.error(`Arama hatası (${endpoint}):`, error);
+        alert(`Arama sırasında bir hata oluştu: ${error.message}`);
+      }
+    }
+
+    function displayResults(endpoint, results) {
+      const resultsDiv = document.getElementById(`resultsList${endpoint.charAt(0).toUpperCase() + endpoint.slice(1)}`);
+      resultsDiv.innerHTML = '';
+
+      if (endpoint === 'gtip') {
+        if (results.length === 0) {
+          resultsDiv.innerHTML = '<p>Eşleşme bulunamadı.</p>';
+          return;
+        }
+        const table = document.createElement('table');
+        table.className = 'treeview';
+        table.innerHTML = `
+          <thead><tr><th>Kod</th><th>Tanım</th></tr></thead>
+          <tbody>${results.map(r => `<tr><td>${r.Kod || ''}</td><td>${r.Tanım || ''}</td></tr>`).join('')}</tbody>
+        `;
+        resultsDiv.appendChild(table);
+      } else if (endpoint === 'izahname') {
+        if (results.length === 0) {
+          resultsDiv.innerHTML = '<p>Eşleşme bulunamadı.</p>';
+          return;
+        }
+        results.forEach(r => {
+          const li = document.createElement('li');
+          li.innerHTML = `${r.paragraph || ''} <span class="detail-link" onclick="showDetail('${r.index}')">Detay...</span>`;
+          resultsDiv.appendChild(li);
+        });
+      } else if (endpoint === 'tarife' || endpoint === 'esya') {
+        if (results.length === 0) {
+          resultsDiv.innerHTML = '<p>Eşleşme bulunamadı.</p>';
+          return;
+        }
+        const table = document.createElement('table');
+        table.className = 'treeview';
+        const headers = endpoint === 'tarife' ? ['1. Kolon', '2. Kolon'] : ['Eşya', 'Armonize Sistem', 'İzahname Notları'];
+        const rows = results.map(r => {
+          const values = endpoint === 'tarife' ? [r.col1 || '', r.col2 || ''] : [r.esya || '', r.armonize || '', r.notlar || ''];
+          return `<tr><td>${values[0]}</td><td>${values[1]}</td>${endpoint === 'esya' ? `<td>${values[2]}</td>` : ''}</tr>`;
+        });
+        table.innerHTML = `
+          <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+          <tbody>${rows.join('')}</tbody>
+        `;
+        resultsDiv.insertBefore(table, resultsDiv.firstChild);
+      }
+    }
+
+    async function showDetail(index) {
+      try {
+        const response = await axios.get('/api/izahname/context', { params: { index } });
+        const results = response.data;
+        const resultsDiv = document.getElementById('resultsListIzahname');
+        resultsDiv.innerHTML = '<h2>İzahname Detay</h2>' + results.map(r => `<p class="${r.isBold ? 'bold' : ''}">${r.paragraph || ''}</p>`).join('') + '<button onclick="hideDetail()">Geri Dön</button>';
+      } function hideDetail() {
+        showTab('izahname');
+        searchData('izahname'); // Önceki arama sonuçlarını yenile
+      }
+    }
+
+    function previousMatch(endpoint) {
+      if (currentMatches[endpoint] > -1) {
+        currentMatches[endpoint] = (currentMatches[endpoint] - 1 + document.querySelectorAll(`#resultsList${endpoint.charAt(0).toUpperCase() + endpoint.slice(1)} table.treeview tbody tr`).length) % document.querySelectorAll(`#resultsList${endpoint.charAt(0).toUpperCase() + endpoint.slice(1)} table.treeview tbody tr`).length;
+        highlightMatch(endpoint);
+      }
+    }
+
+    function nextMatch(endpoint) {
+      if (currentMatches[endpoint] > -1) {
+        currentMatches[endpoint] = (currentMatches[endpoint] + 1) % document.querySelectorAll(`#resultsList${endpoint.charAt(0).toUpperCase() + endpoint.slice(1)} table.treeview tbody tr`).length;
+        highlightMatch(endpoint);
+      }
+    }
+
+    function highlightMatch(endpoint) {
+      const rows = document.querySelectorAll(`#resultsList${endpoint.charAt(0).toUpperCase() + endpoint.slice(1)} table.treeview tbody tr`);
+      rows.forEach(row => row.classList.remove('highlight'));
+      if (currentMatches[endpoint] >= 0 && currentMatches[endpoint] < rows.length) {
+        rows[currentMatches[endpoint]].classList.add('highlight');
+        rows[currentMatches[endpoint]].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }
   </script>
 </body>
