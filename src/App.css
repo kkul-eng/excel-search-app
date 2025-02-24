@@ -146,6 +146,7 @@ label {
   font-weight: bold;
   font-size: 16px;
   padding: 10px 5px;
+  text-align: left;
 }
 
 .row {
@@ -154,6 +155,7 @@ label {
   border-bottom: 1px solid #ddd;
   font-size: 14px;
   color: #2c3e50;
+  text-align: left;
 }
 
 .row.highlight {
@@ -172,6 +174,7 @@ label {
   background-color: #ffffff;
   border-radius: 5px;
   border: 1px solid #ddd;
+  text-align: left;
 }
 
 .detail-link {
