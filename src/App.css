@@ -139,20 +139,8 @@ label {
   margin-bottom: 10px;
 }
 
-.treeview {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.treeview th, .treeview td {
-  padding: 10px;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
-  font-size: 14px;
-  color: #2c3e50;
-}
-
-.treeview th {
+.treeview-header {
+  display: flex;
   background-color: #3498db;
   color: white;
   font-weight: bold;
@@ -160,7 +148,15 @@ label {
   padding: 10px 5px;
 }
 
-.treeview tr.highlight {
+.row {
+  display: flex;
+  padding: 5px 10px;
+  border-bottom: 1px solid #ddd;
+  font-size: 14px;
+  color: #2c3e50;
+}
+
+.row.highlight {
   background-color: #2980b9;
   color: white;
 }
