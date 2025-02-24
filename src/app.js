@@ -24,23 +24,24 @@ function App() {
     return result.toLowerCase();
   };
 
-  // Açılışta veri yükleme
+  // Açılışta veri yükleme (sadece Tarife ve Eşya Fihristi için)
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         let response;
-        if (activeTab === 'gtip') {
-          response = await axios.get('/api/gtip/search', { params: { query: '' } });
-        } else if (activeTab === 'izahname') {
-          response = await axios.get('/api/izahname/search', { params: { query: '' } });
-        } else if (activeTab === 'tarife') {
-          response = await axios.get('/api/tarife/all'); // Tüm veriyi al
+        if (activeTab === 'tarife') {
+          response = await axios.get('/api/tarife/all');
+          setResults(response.data);
+          setSearchResultsIndices([]);
+          setCurrentMatchIndex(-1);
         } else if (activeTab === 'esya-fihristi') {
-          response = await axios.get('/api/esya-fihristi/all'); // Tüm veriyi al
+          response = await axios.get('/api/esya-fihristi/all');
+          setResults(response.data);
+          setSearchResultsIndices([]);
+          setCurrentMatchIndex(-1);
+        } else {
+          setResults([]); // GTİP ve İzahname’de açılışta veri yok
         }
-        setResults(response.data);
-        setSearchResultsIndices([]);
-        setCurrentMatchIndex(-1);
       } catch (error) {
         console.error('Veri yüklenirken hata:', error);
       }
@@ -118,7 +119,7 @@ function App() {
       setDetailResults(response.data);
       setShowDetail(true);
     } catch (error) {
-      alert(`Detay alınırken bir hata oluştu: ${error.message}`);
+      alert(`Detay alınırken hata oluştu: ${error.message}`);
     }
   };
 
