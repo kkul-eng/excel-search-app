@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 
@@ -10,6 +10,39 @@ function App() {
   const [detailResults, setDetailResults] = useState([]);
   const [showDetail, setShowDetail] = useState(false);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+
+  const turkceLower = (text) => {
+    const turkceKarakterler = {
+      'İ': 'i', 'I': 'ı', 'Ş': 'ş', 'Ğ': 'ğ',
+      'Ü': 'ü', 'Ö': 'ö', 'Ç': 'ç'
+    };
+    let result = text || '';
+    for (const [upper, lower] of Object.entries(turkceKarakterler)) {
+      result = result.replace(new RegExp(upper, 'g'), lower);
+    }
+    return result.toLowerCase();
+  };
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        if (activeTab === 'tarife') {
+          const response = await axios.get('/api/tarife/search', { params: { query: '' } });
+          setResults(response.data);
+          setSearchResultsIndices([]);
+          setCurrentMatchIndex(-1);
+        } else if (activeTab === 'esya-fihristi') {
+          const response = await axios.get('/api/esya-fihristi/search', { params: { query: '' } });
+          setResults(response.data);
+          setSearchResultsIndices([]);
+          setCurrentMatchIndex(-1);
+        }
+      } catch (error) {
+        console.error('Veri yüklenirken hata:', error);
+      }
+    };
+    loadInitialData();
+  }, [activeTab]);
 
   const search = async () => {
     if (!query.trim()) {
@@ -33,10 +66,10 @@ function App() {
           alert('Eşleşme bulunamadı.');
         }
       } else if (activeTab === 'izahname') {
-        const searchText = (query.trim() || '').toLowerCase();
+        const searchText = turkceLower(query.trim());
         const keywords = searchText.split(' ');
         const filteredResults = data.filter(row => {
-          const paragraph = (row.paragraph || '').toLowerCase();
+          const paragraph = turkceLower(row.paragraph || '');
           return keywords.every(keyword => paragraph.includes(keyword));
         }).map(row => ({
           index: row.index,
@@ -50,11 +83,11 @@ function App() {
           alert('Eşleşme bulunamadı.');
         }
       } else if (activeTab === 'tarife') {
-        const searchText = (query.trim() || '').toLowerCase();
+        const searchText = turkceLower(query.trim());
         const matchedIndices = [];
         data.forEach((row, index) => {
-          const col1 = (row.col1 || '').toLowerCase();
-          const col2 = (row.col2 || '').toLowerCase();
+          const col1 = turkceLower(row.col1 || '');
+          const col2 = turkceLower(row.col2 || '');
           if (col1.includes(searchText) || col2.includes(searchText)) {
             matchedIndices.push(index);
           }
@@ -67,12 +100,12 @@ function App() {
           alert('Eşleşme bulunamadı.');
         }
       } else if (activeTab === 'esya-fihristi') {
-        const searchText = (query.trim() || '').toLowerCase();
+        const searchText = turkceLower(query.trim());
         const matchedIndices = [];
         data.forEach((row, index) => {
-          const esya = (row.esya || '').toLowerCase();
-          const armonize = (row.armonize || '').toLowerCase();
-          const notlar = (row.notlar || '').toLowerCase();
+          const esya = turkceLower(row.esya || '');
+          const armonize = turkceLower(row.armonize || '');
+          const notlar = turkceLower(row.notlar || '');
           if (esya.includes(searchText) || armonize.includes(searchText) || notlar.includes(searchText)) {
             matchedIndices.push(index);
           }
@@ -147,7 +180,6 @@ function App() {
       </div>
 
       <div className="content">
-        <p style={{ color: 'red', textAlign: 'center' }}>Güncelleme Testi: 24 Şubat 2025</p>
         <h1>{activeTabData.name}</h1>
         <label>{activeTabData.label}</label>
         <div className="search">
