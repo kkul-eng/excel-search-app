@@ -10,10 +10,19 @@ console.log('Build dosyaları aranacak yol:', buildPath);
 app.use(express.static(buildPath));
 
 // Excel dosyalarını bir kez oku ve önbellekte tut
-const gtipData = XLSX.utils.sheet_to_json(XLSX.readFile('gtip.xls').Sheets[XLSX.readFile('gtip.xls').SheetNames[0]]);
-const izahnameData = XLSX.utils.sheet_to_json(XLSX.readFile('izahname.xlsx').Sheets[XLSX.readFile('izahname.xlsx').SheetNames[0]]);
-const tarifeData = XLSX.utils.sheet_to_json(XLSX.readFile('index.xlsx').Sheets[XLSX.readFile('index.xlsx').SheetNames[0]], { defval: '' });
-const esyaFihristiData = XLSX.utils.sheet_to_json(XLSX.readFile('alfabetik_fihrist.xlsx').Sheets[XLSX.readFile('alfabetik_fihrist.xlsx').SheetNames[0]], { defval: '' });
+let gtipData, izahnameData, tarifeData, esyaFihristiData;
+try {
+  gtipData = XLSX.utils.sheet_to_json(XLSX.readFile('gtip.xls').Sheets[XLSX.readFile('gtip.xls').SheetNames[0]]);
+  console.log('gtipData yüklendi:', gtipData.length, 'satır');
+  izahnameData = XLSX.utils.sheet_to_json(XLSX.readFile('izahname.xlsx').Sheets[XLSX.readFile('izahname.xlsx').SheetNames[0]]);
+  console.log('izahnameData yüklendi:', izahnameData.length, 'satır');
+  tarifeData = XLSX.utils.sheet_to_json(XLSX.readFile('index.xlsx').Sheets[XLSX.readFile('index.xlsx').SheetNames[0]], { defval: '' });
+  console.log('tarifeData yüklendi:', tarifeData.length, 'satır');
+  esyaFihristiData = XLSX.utils.sheet_to_json(XLSX.readFile('alfabetik_fihrist.xlsx').Sheets[XLSX.readFile('alfabetik_fihrist.xlsx').SheetNames[0]], { defval: '' });
+  console.log('esyaFihristiData yüklendi:', esyaFihristiData.length, 'satır');
+} catch (error) {
+  console.error('Excel dosyaları yüklenirken hata:', error);
+}
 
 // Türkçe lowercase dönüşümü
 const turkceLower = (text) => {
@@ -78,8 +87,9 @@ app.get('/api/izahname/context', (req, res) => {
   res.json(context);
 });
 
-// Tarife tüm veri endpoint’i (önbellek)
+// Tarife tüm veri endpoint’i
 app.get('/api/tarife/all', (req, res) => {
+  console.log('Tarife tüm veri isteği alındı, satır sayısı:', tarifeData.length);
   res.json(tarifeData);
 });
 
@@ -90,8 +100,9 @@ app.get('/api/tarife/search', (req, res) => {
   res.json(results);
 });
 
-// Eşya Fihristi tüm veri endpoint’i (önbellek)
+// Eşya Fihristi tüm veri endpoint’i
 app.get('/api/esya-fihristi/all', (req, res) => {
+  console.log('Eşya Fihristi tüm veri isteği alındı, satır sayısı:', esyaFihristiData.length);
   res.json(esyaFihristiData);
 });
 
