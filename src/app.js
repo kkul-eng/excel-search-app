@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { List } from 'react-virtualized';
 import './App.css';
 
 function App() {
@@ -11,7 +12,6 @@ function App() {
   const [showDetail, setShowDetail] = useState(false);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
 
-  // Türkçe lowercase dönüşümü
   const turkceLower = (text) => {
     const turkceKarakterler = {
       'İ': 'i', 'I': 'ı', 'Ş': 'ş', 'Ğ': 'ğ',
@@ -23,30 +23,6 @@ function App() {
     }
     return result.toLowerCase();
   };
-
-  // Açılışta veri yükleme
-  useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        let response;
-        if (activeTab === 'gtip') {
-          response = await axios.get('/api/gtip/search', { params: { query: '' } });
-        } else if (activeTab === 'izahname') {
-          response = await axios.get('/api/izahname/search', { params: { query: '' } });
-        } else if (activeTab === 'tarife') {
-          response = await axios.get('/api/tarife/search', { params: { query: '' } });
-        } else if (activeTab === 'esya-fihristi') {
-          response = await axios.get('/api/esya-fihristi/search', { params: { query: '' } });
-        }
-        setResults(response.data);
-        setSearchResultsIndices([]);
-        setCurrentMatchIndex(-1);
-      } catch (error) {
-        console.error('Veri yüklenirken hata:', error);
-      }
-    };
-    loadInitialData();
-  }, [activeTab]);
 
   const search = async () => {
     if (!query.trim()) {
@@ -78,16 +54,12 @@ function App() {
           alert('Eşleşme bulunamadı.');
         }
       } else if (activeTab === 'tarife') {
-        const searchText = turkceLower(query.trim());
-        const matchedIndices = [];
-        data.forEach((row, index) => {
+        setResults(data);
+        const matchedIndices = data.map((row, index) => {
           const col1 = turkceLower(row.col1 || '');
           const col2 = turkceLower(row.col2 || '');
-          if (col1.includes(searchText) || col2.includes(searchText)) {
-            matchedIndices.push(index);
-          }
-        });
-        setResults(data);
+          return col1.includes(turkceLower(query)) || col2.includes(turkceLower(query)) ? index : -1;
+        }).filter(index => index !== -1);
         setSearchResultsIndices(matchedIndices);
         setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
         setShowDetail(false);
@@ -95,17 +67,13 @@ function App() {
           alert('Eşleşme bulunamadı.');
         }
       } else if (activeTab === 'esya-fihristi') {
-        const searchText = turkceLower(query.trim());
-        const matchedIndices = [];
-        data.forEach((row, index) => {
+        setResults(data);
+        const matchedIndices = data.map((row, index) => {
           const esya = turkceLower(row.esya || '');
           const armonize = turkceLower(row.armonize || '');
           const notlar = turkceLower(row.notlar || '');
-          if (esya.includes(searchText) || armonize.includes(searchText) || notlar.includes(searchText)) {
-            matchedIndices.push(index);
-          }
-        });
-        setResults(data);
+          return esya.includes(turkceLower(query)) || armonize.includes(turkceLower(query)) || notlar.includes(turkceLower(query)) ? index : -1;
+        }).filter(index => index !== -1);
         setSearchResultsIndices(matchedIndices);
         setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
         setShowDetail(false);
@@ -160,6 +128,36 @@ function App() {
 
   const activeTabData = tabs.find((tab) => tab.id === activeTab);
 
+  // Sanal liste için satır render fonksiyonu
+  const rowRenderer = ({ index, key, style }) => {
+    const row = results[index];
+    const isHighlighted = searchResultsIndices[currentMatchIndex] === index;
+    if (activeTab === 'gtip') {
+      return (
+        <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : ''}`}>
+          <div style={{ width: '100px' }}>{row.Kod || ''}</div>
+          <div style={{ width: '900px' }}>{row.Tanım || ''}</div>
+        </div>
+      );
+    } else if (activeTab === 'tarife') {
+      return (
+        <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : ''}`}>
+          <div style={{ width: '100px' }}>{row.col1 || ''}</div>
+          <div style={{ width: '900px' }}>{row.col2 || ''}</div>
+        </div>
+      );
+    } else if (activeTab === 'esya-fihristi') {
+      return (
+        <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : ''}`}>
+          <div style={{ width: '800px' }}>{row.esya || ''}</div>
+          <div style={{ width: '200px' }}>{row.armonize || ''}</div>
+          <div style={{ width: '200px' }}>{row.notlar || ''}</div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="app">
       <div className="tabs">
@@ -199,7 +197,7 @@ function App() {
             <h2>İzahname Detay</h2>
             {detailResults.map((result, index) => (
               <p key={index} className={result.isBold ? 'bold' : ''}>
-                {result.paragraph}
+                {result.paragraph || ''}
               </p>
             ))}
             <button onClick={() => setShowDetail(false)}>Geri Dön</button>
@@ -207,22 +205,19 @@ function App() {
         ) : (
           <div className="results">
             {activeTab === 'gtip' && results.length > 0 && (
-              <table className="treeview">
-                <thead>
-                  <tr>
-                    <th>Kod</th>
-                    <th>Tanım</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.map((r, i) => (
-                    <tr key={i}>
-                      <td>{r.Kod || ''}</td>
-                      <td>{r.Tanım || ''}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div>
+                <div className="treeview-header">
+                  <div style={{ width: '100px' }}>Kod</div>
+                  <div style={{ width: '900px' }}>Tanım</div>
+                </div>
+                <List
+                  width={1000}
+                  height={400}
+                  rowCount={results.length}
+                  rowHeight={25}
+                  rowRenderer={rowRenderer}
+                />
+              </div>
             )}
 
             {activeTab === 'izahname' && results.length > 0 && (
@@ -239,49 +234,36 @@ function App() {
             )}
 
             {activeTab === 'tarife' && results.length > 0 && (
-              <table className="treeview">
-                <thead>
-                  <tr>
-                    <th>1. Kolon</th>
-                    <th>2. Kolon</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.map((r, i) => (
-                    <tr
-                      key={i}
-                      className={searchResultsIndices[currentMatchIndex] === i ? 'highlight' : ''}
-                    >
-                      <td>{r.col1 || ''}</td>
-                      <td>{r.col2 || ''}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div>
+                <div className="treeview-header">
+                  <div style={{ width: '100px' }}>1. Kolon</div>
+                  <div style={{ width: '900px' }}>2. Kolon</div>
+                </div>
+                <List
+                  width={1000}
+                  height={400}
+                  rowCount={results.length}
+                  rowHeight={25}
+                  rowRenderer={rowRenderer}
+                />
+              </div>
             )}
 
             {activeTab === 'esya-fihristi' && results.length > 0 && (
-              <table className="treeview">
-                <thead>
-                  <tr>
-                    <th>Eşya</th>
-                    <th>Armonize Sistem</th>
-                    <th>İzahname Notları</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.map((r, i) => (
-                    <tr
-                      key={i}
-                      className={searchResultsIndices[currentMatchIndex] === i ? 'highlight' : ''}
-                    >
-                      <td>{r.esya || ''}</td>
-                      <td>{r.armonize || ''}</td>
-                      <td>{r.notlar || ''}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div>
+                <div className="treeview-header">
+                  <div style={{ width: '800px' }}>Eşya</div>
+                  <div style={{ width: '200px' }}>Armonize Sistem</div>
+                  <div style={{ width: '200px' }}>İzahname Notları</div>
+                </div>
+                <List
+                  width={1200}
+                  height={400}
+                  rowCount={results.length}
+                  rowHeight={25}
+                  rowRenderer={rowRenderer}
+                />
+              </div>
             )}
           </div>
         )}
