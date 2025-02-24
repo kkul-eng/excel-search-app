@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { List } from 'react-virtualized';
 import './App.css';
@@ -11,6 +11,7 @@ function App() {
   const [detailResults, setDetailResults] = useState([]);
   const [showDetail, setShowDetail] = useState(false);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+  const searchInputRef = useRef(null);
 
   const turkceLower = (text) => {
     const turkceKarakterler = {
@@ -50,6 +51,16 @@ function App() {
       }
     };
     loadInitialData();
+
+    // Ctrl + F ile input’a odaklanma
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        searchInputRef.current.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTab]);
 
   const search = async () => {
@@ -84,8 +95,8 @@ function App() {
       } else if (activeTab === 'tarife') {
         setResults(data);
         const matchedIndices = data.map((row, index) => {
-          const col1 = turkceLower(row.col1 || '');
-          const col2 = turkceLower(row.col2 || '');
+          const col1 = turkceLower(row['1. Kolon'] || '');
+          const col2 = turkceLower(row['2. Kolon'] || '');
           return col1.includes(turkceLower(query)) || col2.includes(turkceLower(query)) ? index : -1;
         }).filter(index => index !== -1);
         setSearchResultsIndices(matchedIndices);
@@ -97,9 +108,9 @@ function App() {
       } else if (activeTab === 'esya-fihristi') {
         setResults(data);
         const matchedIndices = data.map((row, index) => {
-          const esya = turkceLower(row.esya || '');
-          const armonize = turkceLower(row.armonize || '');
-          const notlar = turkceLower(row.notlar || '');
+          const esya = turkceLower(row['Eşya'] || '');
+          const armonize = turkceLower(row['Armonize Sistem'] || '');
+          const notlar = turkceLower(row['İzahname Notları'] || '');
           return esya.includes(turkceLower(query)) || armonize.includes(turkceLower(query)) || notlar.includes(turkceLower(query)) ? index : -1;
         }).filter(index => index !== -1);
         setSearchResultsIndices(matchedIndices);
@@ -169,16 +180,16 @@ function App() {
     } else if (activeTab === 'tarife') {
       return (
         <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : ''}`}>
-          <div style={{ width: '100px' }}>{row.col1 || ''}</div>
-          <div style={{ width: '900px' }}>{row.col2 || ''}</div>
+          <div style={{ width: '100px' }}>{row['1. Kolon'] || ''}</div>
+          <div style={{ width: '900px' }}>{row['2. Kolon'] || ''}</div>
         </div>
       );
     } else if (activeTab === 'esya-fihristi') {
       return (
         <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : ''}`}>
-          <div style={{ width: '800px' }}>{row.esya || ''}</div>
-          <div style={{ width: '200px' }}>{row.armonize || ''}</div>
-          <div style={{ width: '200px' }}>{row.notlar || ''}</div>
+          <div style={{ width: '800px' }}>{row['Eşya'] || ''}</div>
+          <div style={{ width: '200px' }}>{row['Armonize Sistem'] || ''}</div>
+          <div style={{ width: '200px' }}>{row['İzahname Notları'] || ''}</div>
         </div>
       );
     }
@@ -204,10 +215,11 @@ function App() {
         <label>{activeTabData.label}</label>
         <div className="search">
           <input
+            ref={searchInputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && search()}
-            placeholder="Arama yapın..."
+            placeholder="Arama yapın (Ctrl + F ile odaklan)"
           />
           <button onClick={search}>Ara</button>
         </div>
