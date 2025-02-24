@@ -11,6 +11,7 @@ function App() {
   const [showDetail, setShowDetail] = useState(false);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
 
+  // Türkçe lowercase dönüşümü
   const turkceLower = (text) => {
     const turkceKarakterler = {
       'İ': 'i', 'I': 'ı', 'Ş': 'ş', 'Ğ': 'ğ',
@@ -23,20 +24,23 @@ function App() {
     return result.toLowerCase();
   };
 
+  // Açılışta veri yükleme
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        if (activeTab === 'tarife') {
-          const response = await axios.get('/api/tarife/search', { params: { query: '' } });
-          setResults(response.data);
-          setSearchResultsIndices([]);
-          setCurrentMatchIndex(-1);
+        let response;
+        if (activeTab === 'gtip') {
+          response = await axios.get('/api/gtip/search', { params: { query: '' } });
+        } else if (activeTab === 'izahname') {
+          response = await axios.get('/api/izahname/search', { params: { query: '' } });
+        } else if (activeTab === 'tarife') {
+          response = await axios.get('/api/tarife/search', { params: { query: '' } });
         } else if (activeTab === 'esya-fihristi') {
-          const response = await axios.get('/api/esya-fihristi/search', { params: { query: '' } });
-          setResults(response.data);
-          setSearchResultsIndices([]);
-          setCurrentMatchIndex(-1);
+          response = await axios.get('/api/esya-fihristi/search', { params: { query: '' } });
         }
+        setResults(response.data);
+        setSearchResultsIndices([]);
+        setCurrentMatchIndex(-1);
       } catch (error) {
         console.error('Veri yüklenirken hata:', error);
       }
@@ -66,20 +70,11 @@ function App() {
           alert('Eşleşme bulunamadı.');
         }
       } else if (activeTab === 'izahname') {
-        const searchText = turkceLower(query.trim());
-        const keywords = searchText.split(' ');
-        const filteredResults = data.filter(row => {
-          const paragraph = turkceLower(row.paragraph || '');
-          return keywords.every(keyword => paragraph.includes(keyword));
-        }).map(row => ({
-          index: row.index,
-          paragraph: row.paragraph
-        }));
-        setResults(filteredResults);
+        setResults(data);
         setSearchResultsIndices([]);
         setCurrentMatchIndex(-1);
         setShowDetail(false);
-        if (!filteredResults.length) {
+        if (!data.length) {
           alert('Eşleşme bulunamadı.');
         }
       } else if (activeTab === 'tarife') {
@@ -222,8 +217,8 @@ function App() {
                 <tbody>
                   {results.map((r, i) => (
                     <tr key={i}>
-                      <td>{r.Kod}</td>
-                      <td>{r.Tanım}</td>
+                      <td>{r.Kod || ''}</td>
+                      <td>{r.Tanım || ''}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -234,7 +229,7 @@ function App() {
               <div className="izahname-results">
                 {results.map((r, i) => (
                   <div key={i} className="izahname-result">
-                    {r.paragraph}{' '}
+                    {r.paragraph || ''}{' '}
                     <span className="detail-link" onClick={() => fetchDetail(r.index)}>
                       Detay...
                     </span>
@@ -243,13 +238,12 @@ function App() {
               </div>
             )}
 
-            {['tarife', 'esya-fihristi'].includes(activeTab) && results.length > 0 && (
+            {activeTab === 'tarife' && results.length > 0 && (
               <table className="treeview">
                 <thead>
                   <tr>
-                    <th>{activeTab === 'tarife' ? '1. Kolon' : 'Eşya'}</th>
-                    <th>{activeTab === 'tarife' ? '2. Kolon' : 'Armonize Sistem'}</th>
-                    {activeTab === 'esya-fihristi' && <th>İzahname Notları</th>}
+                    <th>1. Kolon</th>
+                    <th>2. Kolon</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -258,9 +252,32 @@ function App() {
                       key={i}
                       className={searchResultsIndices[currentMatchIndex] === i ? 'highlight' : ''}
                     >
-                      <td>{r.col1 || r.esya}</td>
-                      <td>{r.col2 || r.armonize}</td>
-                      {activeTab === 'esya-fihristi' && <td>{r.notlar}</td>}
+                      <td>{r.col1 || ''}</td>
+                      <td>{r.col2 || ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {activeTab === 'esya-fihristi' && results.length > 0 && (
+              <table className="treeview">
+                <thead>
+                  <tr>
+                    <th>Eşya</th>
+                    <th>Armonize Sistem</th>
+                    <th>İzahname Notları</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((r, i) => (
+                    <tr
+                      key={i}
+                      className={searchResultsIndices[currentMatchIndex] === i ? 'highlight' : ''}
+                    >
+                      <td>{r.esya || ''}</td>
+                      <td>{r.armonize || ''}</td>
+                      <td>{r.notlar || ''}</td>
                     </tr>
                   ))}
                 </tbody>
