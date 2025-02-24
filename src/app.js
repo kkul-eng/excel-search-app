@@ -12,6 +12,7 @@ function App() {
   const [showDetail, setShowDetail] = useState(false);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
   const searchInputRef = useRef(null);
+  const listRef = useRef(null);
 
   const turkceLower = (text) => {
     const turkceKarakterler = {
@@ -52,9 +53,9 @@ function App() {
     };
     loadInitialData();
 
-    // Ctrl + F ile input’a odaklanma
+    // Ctrl + F ile input’a odaklanma (GTİP hariç)
     const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.key === 'f') {
+      if (e.ctrlKey && e.key === 'f' && activeTab !== 'gtip') {
         e.preventDefault();
         searchInputRef.current.focus();
       }
@@ -92,30 +93,26 @@ function App() {
         if (!data.length) {
           alert('Eşleşme bulunamadı.');
         }
-      } else if (activeTab === 'tarife') {
-        setResults(data);
-        const matchedIndices = data.map((row, index) => {
-          const col1 = turkceLower(row['1. Kolon'] || '');
-          const col2 = turkceLower(row['2. Kolon'] || '');
-          return col1.includes(turkceLower(query)) || col2.includes(turkceLower(query)) ? index : -1;
+      } else if (activeTab === 'tarife' || activeTab === 'esya-fihristi') {
+        // Tam veriyi koru, sadece eşleşmeleri işaretle
+        const matchedIndices = results.map((row, index) => {
+          if (activeTab === 'tarife') {
+            const col1 = turkceLower(row['1. Kolon'] || '');
+            const col2 = turkceLower(row['2. Kolon'] || '');
+            return col1.includes(turkceLower(query)) || col2.includes(turkceLower(query)) ? index : -1;
+          } else {
+            const esya = turkceLower(row['Eşya'] || '');
+            const armonize = turkceLower(row['Armonize Sistem'] || '');
+            const notlar = turkceLower(row['İzahname Notları'] || '');
+            return esya.includes(turkceLower(query)) || armonize.includes(turkceLower(query)) || notlar.includes(turkceLower(query)) ? index : -1;
+          }
         }).filter(index => index !== -1);
         setSearchResultsIndices(matchedIndices);
         setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
         setShowDetail(false);
-        if (!matchedIndices.length) {
-          alert('Eşleşme bulunamadı.');
+        if (matchedIndices.length > 0 && listRef.current) {
+          listRef.current.scrollToRow(matchedIndices[0]); // İlk eşleşmeye kaydır
         }
-      } else if (activeTab === 'esya-fihristi') {
-        setResults(data);
-        const matchedIndices = data.map((row, index) => {
-          const esya = turkceLower(row['Eşya'] || '');
-          const armonize = turkceLower(row['Armonize Sistem'] || '');
-          const notlar = turkceLower(row['İzahname Notları'] || '');
-          return esya.includes(turkceLower(query)) || armonize.includes(turkceLower(query)) || notlar.includes(turkceLower(query)) ? index : -1;
-        }).filter(index => index !== -1);
-        setSearchResultsIndices(matchedIndices);
-        setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
-        setShowDetail(false);
         if (!matchedIndices.length) {
           alert('Eşleşme bulunamadı.');
         }
@@ -139,13 +136,25 @@ function App() {
 
   const nextMatch = () => {
     if (searchResultsIndices.length > 0) {
-      setCurrentMatchIndex((prev) => (prev + 1) % searchResultsIndices.length);
+      setCurrentMatchIndex((prev) => {
+        const newIndex = (prev + 1) % searchResultsIndices.length;
+        if (listRef.current) {
+          listRef.current.scrollToRow(searchResultsIndices[newIndex]);
+        }
+        return newIndex;
+      });
     }
   };
 
   const previousMatch = () => {
     if (searchResultsIndices.length > 0) {
-      setCurrentMatchIndex((prev) => (prev - 1 + searchResultsIndices.length) % searchResultsIndices.length);
+      setCurrentMatchIndex((prev) => {
+        const newIndex = (prev - 1 + searchResultsIndices.length) % searchResultsIndices.length;
+        if (listRef.current) {
+          listRef.current.scrollToRow(searchResultsIndices[newIndex]);
+        }
+        return newIndex;
+      });
     }
   };
 
@@ -219,7 +228,7 @@ function App() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && search()}
-            placeholder="Arama yapın (Ctrl + F ile odaklan)"
+            placeholder={activeTab === 'gtip' ? 'Arama yapın...' : 'Arama yapın (Ctrl + F ile odaklan)'}
           />
           <button onClick={search}>Ara</button>
         </div>
@@ -279,6 +288,7 @@ function App() {
                   <div style={{ width: '900px' }}>2. Kolon</div>
                 </div>
                 <List
+                  ref={listRef}
                   width={1000}
                   height={400}
                   rowCount={results.length}
@@ -296,6 +306,7 @@ function App() {
                   <div style={{ width: '200px' }}>İzahname Notları</div>
                 </div>
                 <List
+                  ref={listRef}
                   width={1200}
                   height={400}
                   rowCount={results.length}
