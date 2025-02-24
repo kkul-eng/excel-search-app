@@ -99,7 +99,7 @@ app.get('/api/tarife/all', (req, res) => {
 // Tarife arama endpoint’i
 app.get('/api/tarife/search', (req, res) => {
   const query = turkceLower(req.query.query || '');
-  const results = kelimeArama(tarifeData, query, ['col1', 'col2']);
+  const results = kelimeArama(tarifeData, query, ['1. Kolon', '2. Kolon']);
   console.log('Tarife arama sonuçları:', results.length);
   res.json(results);
 });
@@ -113,7 +113,7 @@ app.get('/api/esya-fihristi/all', (req, res) => {
 // Eşya Fihristi arama endpoint’i
 app.get('/api/esya-fihristi/search', (req, res) => {
   const query = turkceLower(req.query.query || '');
-  const results = kelimeArama(esyaFihristiData, query, ['esya', 'armonize', 'notlar']);
+  const results = kelimeArama(esyaFihristiData, query, ['Eşya', 'Armonize Sistem', 'İzahname Notları']);
   console.log('Eşya Fihristi arama sonuçları:', results.length);
   res.json(results);
 });
