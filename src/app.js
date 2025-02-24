@@ -31,18 +31,19 @@ function App() {
         let response;
         if (activeTab === 'tarife') {
           response = await axios.get('/api/tarife/all');
-          console.log('Tarife Cetveli verisi:', response.data); // Debug log
+          console.log('Tarife Cetveli açılış verisi:', response.data);
           setResults(response.data);
           setSearchResultsIndices([]);
           setCurrentMatchIndex(-1);
         } else if (activeTab === 'esya-fihristi') {
           response = await axios.get('/api/esya-fihristi/all');
-          console.log('Eşya Fihristi verisi:', response.data); // Debug log
+          console.log('Eşya Fihristi açılış verisi:', response.data);
           setResults(response.data);
           setSearchResultsIndices([]);
           setCurrentMatchIndex(-1);
         } else {
           setResults([]); // GTİP ve İzahname açılışta boş
+          console.log(`${activeTab} sekmesi açılışta boş bırakıldı`);
         }
       } catch (error) {
         console.error('Veri yüklenirken hata:', error);
@@ -62,7 +63,7 @@ function App() {
         params: { query },
       });
       const data = response.data;
-      console.log('Arama verisi:', data);
+      console.log(`${activeTab} arama verisi:`, data);
 
       if (activeTab === 'gtip') {
         setResults(data);
