@@ -11,107 +11,97 @@ function App() {
   const [showDetail, setShowDetail] = useState(false);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
 
-  // Turkish lowercase conversion
-  const turkceLower = (text) => {
-    const turkceKarakterler = {
-      'İ': 'i', 'I': 'ı', 'Ş': 'ş', 'Ğ': 'ğ',
-      'Ü': 'ü', 'Ö': 'ö', 'Ç': 'ç'
-    };
-    let result = text;
-    for (const [upper, lower] of Object.entries(turkceKarakterler)) {
-      result = result.replace(new RegExp(upper, 'g'), lower);
-    }
-    return result.toLowerCase();
-  };
-
-  // Arama fonksiyonu
   const search = async () => {
     if (!query.trim()) {
-      alert('Lütfen bir arama terimi girin.');
+      alert('Lütfen geçerli bir kelime veya ifade girin.');
       return;
     }
+
     try {
-      const response = await axios.get(`https://excel-search-app-6.onrender.com/api/${activeTab}/search`, {
+      const response = await axios.get(`/api/${activeTab}/search`, {
         params: { query },
       });
       const data = response.data;
+      console.log('Backend verisi:', data);
 
       if (activeTab === 'gtip') {
-        const searchText = turkceLower(query.trim());
-        const filteredResults = data.filter(row => {
-          if (/^\d+$/.test(searchText)) {
-            return row.Kod.startsWith(searchText);
-          } else {
-            const keywords = searchText.split(' ');
-            const description = turkceLower(row.Tanım);
-            return keywords.every(keyword => description.includes(keyword));
-          }
-        });
-        setResults(filteredResults);
+        setResults(data);
         setSearchResultsIndices([]);
         setCurrentMatchIndex(-1);
         setShowDetail(false);
+        if (!data.length) {
+          alert('Eşleşme bulunamadı.');
+        }
       } else if (activeTab === 'izahname') {
-        const searchText = turkceLower(query.trim());
+        const searchText = (query.trim() || '').toLowerCase();
         const keywords = searchText.split(' ');
         const filteredResults = data.filter(row => {
-          const paragraph = turkceLower(row.paragraph);
+          const paragraph = (row.paragraph || '').toLowerCase();
           return keywords.every(keyword => paragraph.includes(keyword));
-        });
+        }).map(row => ({
+          index: row.index,
+          paragraph: row.paragraph
+        }));
         setResults(filteredResults);
         setSearchResultsIndices([]);
         setCurrentMatchIndex(-1);
         setShowDetail(false);
+        if (!filteredResults.length) {
+          alert('Eşleşme bulunamadı.');
+        }
       } else if (activeTab === 'tarife') {
-        const searchText = turkceLower(query.trim());
-        const matchedIndices = data.reduce((acc, row, index) => {
-          const col1 = turkceLower(row.col1 || '');
-          const col2 = turkceLower(row.col2 || '');
+        const searchText = (query.trim() || '').toLowerCase();
+        const matchedIndices = [];
+        data.forEach((row, index) => {
+          const col1 = (row.col1 || '').toLowerCase();
+          const col2 = (row.col2 || '').toLowerCase();
           if (col1.includes(searchText) || col2.includes(searchText)) {
-            acc.push(index);
+            matchedIndices.push(index);
           }
-          return acc;
-        }, []);
+        });
         setResults(data);
         setSearchResultsIndices(matchedIndices);
         setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
         setShowDetail(false);
+        if (!matchedIndices.length) {
+          alert('Eşleşme bulunamadı.');
+        }
       } else if (activeTab === 'esya-fihristi') {
-        const searchText = turkceLower(query.trim());
-        const matchedIndices = data.reduce((acc, row, index) => {
-          const esya = turkceLower(row.esya || '');
-          const armonize = turkceLower(row.armonize || '');
-          const notlar = turkceLower(row.notlar || '');
+        const searchText = (query.trim() || '').toLowerCase();
+        const matchedIndices = [];
+        data.forEach((row, index) => {
+          const esya = (row.esya || '').toLowerCase();
+          const armonize = (row.armonize || '').toLowerCase();
+          const notlar = (row.notlar || '').toLowerCase();
           if (esya.includes(searchText) || armonize.includes(searchText) || notlar.includes(searchText)) {
-            acc.push(index);
+            matchedIndices.push(index);
           }
-          return acc;
-        }, []);
+        });
         setResults(data);
         setSearchResultsIndices(matchedIndices);
         setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
         setShowDetail(false);
+        if (!matchedIndices.length) {
+          alert('Eşleşme bulunamadı.');
+        }
       }
     } catch (error) {
-      console.error('Arama hatası:', error);
-      alert('Arama sırasında bir hata oluştu.');
+      alert(`Arama sırasında bir hata oluştu: ${error.message}`);
     }
   };
 
-  // Detay verisini çekme
   const fetchDetail = async (index) => {
     try {
-      const response = await axios.get('https://excel-search-app-6.onrender.com/api/izahname/context', {
+      const response = await axios.get('/api/izahname/context', {
         params: { index },
       });
       setDetailResults(response.data);
       setShowDetail(true);
     } catch (error) {
-      console.error('Detay hatası:', error);
+      alert(`Detay alınırken bir hata oluştu: ${error.message}`);
     }
   };
 
-  // Navigation fonksiyonları
   const nextMatch = () => {
     if (searchResultsIndices.length > 0) {
       setCurrentMatchIndex((prev) => (prev + 1) % searchResultsIndices.length);
@@ -124,7 +114,6 @@ function App() {
     }
   };
 
-  // Sekme değiştirme
   const resetState = (tabId) => {
     setActiveTab(tabId);
     setResults([]);
@@ -158,6 +147,7 @@ function App() {
       </div>
 
       <div className="content">
+        <p style={{ color: 'red', textAlign: 'center' }}>Güncelleme Testi: 24 Şubat 2025</p>
         <h1>{activeTabData.name}</h1>
         <label>{activeTabData.label}</label>
         <div className="search">
@@ -243,10 +233,6 @@ function App() {
                   ))}
                 </tbody>
               </table>
-            )}
-
-            {(results.length === 0 || (['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length === 0)) && query && (
-              <p>Eşleşme bulunamadı.</p>
             )}
           </div>
         )}
