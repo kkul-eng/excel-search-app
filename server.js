@@ -30,7 +30,7 @@ const turkceLower = (text) => {
 
 // Tkinter'daki kelime_arama mantığı
 const kelimeArama = (data, searchText, columns) => {
-  if (!searchText) return []; // Açılışta boş sonuç dön
+  if (!searchText) return data; // Boşsa tüm veriyi dön
   if (/^\d+$/.test(searchText)) {
     return data.filter(row => String(row[columns[0]] || '').startsWith(searchText));
   } else {
@@ -78,11 +78,21 @@ app.get('/api/izahname/context', (req, res) => {
   res.json(context);
 });
 
+// Tarife tüm veri endpoint’i
+app.get('/api/tarife/all', (req, res) => {
+  res.json(tarifeData);
+});
+
 // Tarife arama endpoint’i
 app.get('/api/tarife/search', (req, res) => {
   const query = turkceLower(req.query.query || '');
   const results = kelimeArama(tarifeData, query, ['col1', 'col2']);
   res.json(results);
+});
+
+// Eşya Fihristi tüm veri endpoint’i
+app.get('/api/esya-fihristi/all', (req, res) => {
+  res.json(esyaFihristiData);
 });
 
 // Eşya Fihristi arama endpoint’i
