@@ -24,23 +24,25 @@ function App() {
     return result.toLowerCase();
   };
 
-  // Açılışta veri yükleme (sadece Tarife ve Eşya Fihristi için)
+  // Açılışta veri yükleme
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         let response;
         if (activeTab === 'tarife') {
           response = await axios.get('/api/tarife/all');
+          console.log('Tarife Cetveli verisi:', response.data); // Debug log
           setResults(response.data);
           setSearchResultsIndices([]);
           setCurrentMatchIndex(-1);
         } else if (activeTab === 'esya-fihristi') {
           response = await axios.get('/api/esya-fihristi/all');
+          console.log('Eşya Fihristi verisi:', response.data); // Debug log
           setResults(response.data);
           setSearchResultsIndices([]);
           setCurrentMatchIndex(-1);
         } else {
-          setResults([]); // GTİP ve İzahname’de açılışta veri yok
+          setResults([]); // GTİP ve İzahname açılışta boş
         }
       } catch (error) {
         console.error('Veri yüklenirken hata:', error);
@@ -60,7 +62,7 @@ function App() {
         params: { query },
       });
       const data = response.data;
-      console.log('Backend verisi:', data);
+      console.log('Arama verisi:', data);
 
       if (activeTab === 'gtip') {
         setResults(data);
