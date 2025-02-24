@@ -55,10 +55,13 @@ app.get('/api/gtip/search', (req, res) => {
 app.get('/api/izahname/search', (req, res) => {
   const query = turkceLower(req.query.query || '');
   const results = izahnameData.filter(row => {
-    const paragraph = turkceLower(row.paragraph || '');
+    const paragraph = turkceLower(row.paragraf || row.paragraph || '');
     return query.split(' ').every(keyword => paragraph.includes(keyword));
   });
-  res.json(results);
+  res.json(results.map(row => ({
+    index: row.index,
+    paragraph: row.paragraf || row.paragraph || ''
+  })));
 });
 
 // İzahname detay endpoint’i
@@ -73,7 +76,7 @@ app.get('/api/izahname/context', (req, res) => {
   const startIndex = Math.max(0, actualIndex - 25);
   const endIndex = Math.min(izahnameData.length - 1, actualIndex + 25);
   const context = izahnameData.slice(startIndex, endIndex + 1).map(row => ({
-    paragraph: row.paragraph,
+    paragraph: row.paragraf || row.paragraph || '',
     isBold: row.index === index
   }));
 
