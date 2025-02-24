@@ -24,6 +24,30 @@ function App() {
     return result.toLowerCase();
   };
 
+  // Açılışta veri yükleme
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        let response;
+        if (activeTab === 'gtip') {
+          response = await axios.get('/api/gtip/search', { params: { query: '' } });
+        } else if (activeTab === 'izahname') {
+          response = await axios.get('/api/izahname/search', { params: { query: '' } });
+        } else if (activeTab === 'tarife') {
+          response = await axios.get('/api/tarife/all'); // Tüm veriyi al
+        } else if (activeTab === 'esya-fihristi') {
+          response = await axios.get('/api/esya-fihristi/all'); // Tüm veriyi al
+        }
+        setResults(response.data);
+        setSearchResultsIndices([]);
+        setCurrentMatchIndex(-1);
+      } catch (error) {
+        console.error('Veri yüklenirken hata:', error);
+      }
+    };
+    loadInitialData();
+  }, [activeTab]);
+
   const search = async () => {
     if (!query.trim()) {
       alert('Lütfen geçerli bir kelime veya ifade girin.');
@@ -128,7 +152,6 @@ function App() {
 
   const activeTabData = tabs.find((tab) => tab.id === activeTab);
 
-  // Sanal liste için satır render fonksiyonu
   const rowRenderer = ({ index, key, style }) => {
     const row = results[index];
     const isHighlighted = searchResultsIndices[currentMatchIndex] === index;
