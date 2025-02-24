@@ -9,7 +9,7 @@ const buildPath = path.join(__dirname, 'build');
 console.log('Build dosyaları aranacak yol:', buildPath);
 app.use(express.static(buildPath));
 
-// Excel dosyalarını yükle
+// Excel dosyalarını bir kez oku ve önbellekte tut
 const gtipData = XLSX.utils.sheet_to_json(XLSX.readFile('gtip.xls').Sheets[XLSX.readFile('gtip.xls').SheetNames[0]]);
 const izahnameData = XLSX.utils.sheet_to_json(XLSX.readFile('izahname.xlsx').Sheets[XLSX.readFile('izahname.xlsx').SheetNames[0]]);
 const tarifeData = XLSX.utils.sheet_to_json(XLSX.readFile('index.xlsx').Sheets[XLSX.readFile('index.xlsx').SheetNames[0]], { defval: '' });
@@ -30,7 +30,7 @@ const turkceLower = (text) => {
 
 // Tkinter'daki kelime_arama mantığı
 const kelimeArama = (data, searchText, columns) => {
-  if (!searchText) return data; // Boşsa tüm veriyi dön
+  if (!searchText) return []; // Boşsa veri döndürme
   if (/^\d+$/.test(searchText)) {
     return data.filter(row => String(row[columns[0]] || '').startsWith(searchText));
   } else {
@@ -78,7 +78,7 @@ app.get('/api/izahname/context', (req, res) => {
   res.json(context);
 });
 
-// Tarife tüm veri endpoint’i
+// Tarife tüm veri endpoint’i (önbellek)
 app.get('/api/tarife/all', (req, res) => {
   res.json(tarifeData);
 });
@@ -90,7 +90,7 @@ app.get('/api/tarife/search', (req, res) => {
   res.json(results);
 });
 
-// Eşya Fihristi tüm veri endpoint’i
+// Eşya Fihristi tüm veri endpoint’i (önbellek)
 app.get('/api/esya-fihristi/all', (req, res) => {
   res.json(esyaFihristiData);
 });
