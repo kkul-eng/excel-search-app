@@ -30,9 +30,7 @@ const turkceLower = (text) => {
 
 // Tkinter'daki kelime_arama mantığı
 const kelimeArama = (data, searchText, columns) => {
-  const results = [];
-  if (!searchText) return data; // Boşsa tüm veriyi dön
-
+  if (!searchText) return []; // Açılışta boş sonuç dön
   if (/^\d+$/.test(searchText)) {
     return data.filter(row => String(row[columns[0]] || '').startsWith(searchText));
   } else {
@@ -54,13 +52,10 @@ app.get('/api/gtip/search', (req, res) => {
 // İzahname arama endpoint’i
 app.get('/api/izahname/search', (req, res) => {
   const query = turkceLower(req.query.query || '');
-  const results = izahnameData.filter(row => {
-    const paragraph = turkceLower(row.paragraf || row.paragraph || '');
-    return query.split(' ').every(keyword => paragraph.includes(keyword));
-  });
+  const results = kelimeArama(izahnameData, query, ['paragraf']);
   res.json(results.map(row => ({
     index: row.index,
-    paragraph: row.paragraf || row.paragraph || ''
+    paragraph: row.paragraf || ''
   })));
 });
 
@@ -76,7 +71,7 @@ app.get('/api/izahname/context', (req, res) => {
   const startIndex = Math.max(0, actualIndex - 25);
   const endIndex = Math.min(izahnameData.length - 1, actualIndex + 25);
   const context = izahnameData.slice(startIndex, endIndex + 1).map(row => ({
-    paragraph: row.paragraf || row.paragraph || '',
+    paragraph: row.paragraf || '',
     isBold: row.index === index
   }));
 
