@@ -13,13 +13,13 @@ app.use(express.static(buildPath));
 let gtipData, izahnameData, tarifeData, esyaFihristiData;
 try {
   gtipData = XLSX.utils.sheet_to_json(XLSX.readFile('gtip.xls').Sheets[XLSX.readFile('gtip.xls').SheetNames[0]]);
-  console.log('gtipData yüklendi:', gtipData.length, 'satır');
+  console.log('gtipData yüklendi:', gtipData.length, 'satır, sütunlar:', Object.keys(gtipData[0] || {}));
   izahnameData = XLSX.utils.sheet_to_json(XLSX.readFile('izahname.xlsx').Sheets[XLSX.readFile('izahname.xlsx').SheetNames[0]]);
-  console.log('izahnameData yüklendi:', izahnameData.length, 'satır');
+  console.log('izahnameData yüklendi:', izahnameData.length, 'satır, sütunlar:', Object.keys(izahnameData[0] || {}));
   tarifeData = XLSX.utils.sheet_to_json(XLSX.readFile('index.xlsx').Sheets[XLSX.readFile('index.xlsx').SheetNames[0]], { defval: '' });
-  console.log('tarifeData yüklendi:', tarifeData.length, 'satır');
+  console.log('tarifeData yüklendi:', tarifeData.length, 'satır, sütunlar:', Object.keys(tarifeData[0] || {}));
   esyaFihristiData = XLSX.utils.sheet_to_json(XLSX.readFile('alfabetik_fihrist.xlsx').Sheets[XLSX.readFile('alfabetik_fihrist.xlsx').SheetNames[0]], { defval: '' });
-  console.log('esyaFihristiData yüklendi:', esyaFihristiData.length, 'satır');
+  console.log('esyaFihristiData yüklendi:', esyaFihristiData.length, 'satır, sütunlar:', Object.keys(esyaFihristiData[0] || {}));
 } catch (error) {
   console.error('Excel dosyaları yüklenirken hata:', error);
 }
@@ -39,7 +39,7 @@ const turkceLower = (text) => {
 
 // Tkinter'daki kelime_arama mantığı
 const kelimeArama = (data, searchText, columns) => {
-  if (!searchText) return []; // Boşsa veri döndürme
+  if (!searchText) return data; // Boşsa tüm veriyi dön
   if (/^\d+$/.test(searchText)) {
     return data.filter(row => String(row[columns[0]] || '').startsWith(searchText));
   } else {
@@ -55,6 +55,7 @@ const kelimeArama = (data, searchText, columns) => {
 app.get('/api/gtip/search', (req, res) => {
   const query = turkceLower(req.query.query || '');
   const results = kelimeArama(gtipData, query, ['Kod', 'Tanım']);
+  console.log('GTİP arama sonuçları:', results.length);
   res.json(results);
 });
 
@@ -62,6 +63,7 @@ app.get('/api/gtip/search', (req, res) => {
 app.get('/api/izahname/search', (req, res) => {
   const query = turkceLower(req.query.query || '');
   const results = kelimeArama(izahnameData, query, ['paragraf']);
+  console.log('İzahname arama sonuçları:', results.length);
   res.json(results.map(row => ({
     index: row.index,
     paragraph: row.paragraf || ''
@@ -84,6 +86,7 @@ app.get('/api/izahname/context', (req, res) => {
     isBold: row.index === index
   }));
 
+  console.log('İzahname detay sonuçları:', context.length);
   res.json(context);
 });
 
@@ -97,6 +100,7 @@ app.get('/api/tarife/all', (req, res) => {
 app.get('/api/tarife/search', (req, res) => {
   const query = turkceLower(req.query.query || '');
   const results = kelimeArama(tarifeData, query, ['col1', 'col2']);
+  console.log('Tarife arama sonuçları:', results.length);
   res.json(results);
 });
 
@@ -110,6 +114,7 @@ app.get('/api/esya-fihristi/all', (req, res) => {
 app.get('/api/esya-fihristi/search', (req, res) => {
   const query = turkceLower(req.query.query || '');
   const results = kelimeArama(esyaFihristiData, query, ['esya', 'armonize', 'notlar']);
+  console.log('Eşya Fihristi arama sonuçları:', results.length);
   res.json(results);
 });
 
