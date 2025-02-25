@@ -17,11 +17,12 @@ function App() {
   const listRef = useRef(null);
 
   const turkceLower = (text) => {
+    if (!text) return '';
     const turkceKarakterler = {
       'İ': 'i', 'I': 'ı', 'Ş': 'ş', 'Ğ': 'ğ',
       'Ü': 'ü', 'Ö': 'ö', 'Ç': 'ç'
     };
-    let result = text || '';
+    let result = text;
     for (const [upper, lower] of Object.entries(turkceKarakterler)) {
       result = result.replace(new RegExp(upper, 'g'), lower);
     }
@@ -125,15 +126,20 @@ function App() {
         }
       } else if (activeTab === 'tarife' || activeTab === 'esya-fihristi') {
         const matchedIndices = results.map((row, index) => {
-          if (activeTab === 'tarife') {
-            const col1 = turkceLower(row['1. Kolon'] || '');
-            const col2 = turkceLower(row['2. Kolon'] || '');
-            return col1.includes(turkceLower(query)) || col2.includes(turkceLower(query)) ? index : -1;
-          } else {
-            const esya = turkceLower(row['Eşya'] || '');
-            const armonize = turkceLower(row['Armonize Sistem'] || '');
-            const notlar = turkceLower(row['İzahname Notları'] || '');
-            return esya.includes(turkceLower(query)) || armonize.includes(turkceLower(query)) || notlar.includes(turkceLower(query)) ? index : -1;
+          try {
+            if (activeTab === 'tarife') {
+              const col1 = turkceLower(row['1. Kolon'] || '');
+              const col2 = turkceLower(row['2. Kolon'] || '');
+              return col1.includes(turkceLower(query)) || col2.includes(turkceLower(query)) ? index : -1;
+            } else {
+              const esya = turkceLower(row['Eşya'] || '');
+              const armonize = turkceLower(row['Armonize Sistem'] || '');
+              const notlar = turkceLower(row['İzahname Notları'] || '');
+              return esya.includes(turkceLower(query)) || armonize.includes(turkceLower(query)) || notlar.includes(turkceLower(query)) ? index : -1;
+            }
+          } catch (err) {
+            console.error('Row processing error:', err, row);
+            return -1;
           }
         }).filter(index => index !== -1);
         setSearchResultsIndices(matchedIndices);
@@ -213,34 +219,45 @@ function App() {
   const activeTabData = tabs.find((tab) => tab.id === activeTab);
 
   const rowRenderer = ({ index, key, style }) => {
-    const row = results[index];
-    const isHighlighted = searchResultsIndices[currentMatchIndex] === index;
-    const isMatch = searchResultsIndices.includes(index);
+    try {
+      const row = results[index];
+      if (!row) return null;
 
-    if (activeTab === 'gtip') {
+      const isHighlighted = searchResultsIndices[currentMatchIndex] === index;
+      const isMatch = searchResultsIndices.includes(index);
+
+      if (activeTab === 'gtip') {
+        return (
+          <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : ''}`}>
+            <div className="cell code">{row.Kod || ''}</div>
+            <div className="cell description">{row.Tanım || ''}</div>
+          </div>
+        );
+      } else if (activeTab === 'tarife') {
+        return (
+          <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`}>
+            <div className="cell code">{row['1. Kolon'] || ''}</div>
+            <div className="cell description">{row['2. Kolon'] || ''}</div>
+          </div>
+        );
+      } else if (activeTab === 'esya-fihristi') {
+        return (
+          <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`}>
+            <div className="cell item">{row['Eşya'] || ''}</div>
+            <div className="cell harmonized">{row['Armonize Sistem'] || ''}</div>
+            <div className="cell notes">{row['İzahname Notları'] || ''}</div>
+          </div>
+        );
+      }
+      return null;
+    } catch (err) {
+      console.error('Row rendering error:', err);
       return (
-        <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : ''}`}>
-          <div className="cell code">{row.Kod || ''}</div>
-          <div className="cell description">{row.Tanım || ''}</div>
-        </div>
-      );
-    } else if (activeTab === 'tarife') {
-      return (
-        <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`}>
-          <div className="cell code">{row['1. Kolon'] || ''}</div>
-          <div className="cell description">{row['2. Kolon'] || ''}</div>
-        </div>
-      );
-    } else if (activeTab === 'esya-fihristi') {
-      return (
-        <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`}>
-          <div className="cell item">{row['Eşya'] || ''}</div>
-          <div className="cell harmonized">{row['Armonize Sistem'] || ''}</div>
-          <div className="cell notes">{row['İzahname Notları'] || ''}</div>
+        <div key={key} style={style} className="row">
+          <div className="cell">Error displaying row</div>
         </div>
       );
     }
-    return null;
   };
 
   return (
@@ -330,7 +347,7 @@ function App() {
                 </div>
                 <List
                   ref={listRef}
-                  width={1000}
+                  width={Math.min(1000, window.innerWidth - 40)}
                   height={400}
                   rowCount={results.length}
                   rowHeight={30}
@@ -361,7 +378,7 @@ function App() {
                 </div>
                 <List
                   ref={listRef}
-                  width={1000}
+                  width={Math.min(1000, window.innerWidth - 40)}
                   height={400}
                   rowCount={results.length}
                   rowHeight={30}
@@ -380,7 +397,7 @@ function App() {
                 </div>
                 <List
                   ref={listRef}
-                  width={1000}
+                  width={Math.min(1000, window.innerWidth - 40)}
                   height={400}
                   rowCount={results.length}
                   rowHeight={30}
