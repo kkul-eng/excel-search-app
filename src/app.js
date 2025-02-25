@@ -266,7 +266,7 @@ function App() {
         <div className="search-container">
           <label>{activeTabData.label}</label>
           <div className="search">
-            {['tarife', 'esya-fihristi'].includes(activeTab) && (
+            {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 1 && (
               <button
                 onClick={previousMatch}
                 className="nav-button"
@@ -286,7 +286,7 @@ function App() {
             <button onClick={search} disabled={isLoading}>
               {isLoading ? 'Aranıyor...' : 'Ara'}
             </button>
-            {['tarife', 'esya-fihristi'].includes(activeTab) && (
+            {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 1 && (
               <button
                 onClick={nextMatch}
                 className="nav-button"
