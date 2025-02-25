@@ -114,8 +114,6 @@ function App() {
         setShowDetail(false);
         if (!data.length) {
           showToast('Eşleşme bulunamadı.', 'error');
-        } else {
-          showToast(`${data.length} eşleşme bulundu.`, 'success');
         }
       } else if (activeTab === 'izahname') {
         setResults(data);
@@ -124,8 +122,6 @@ function App() {
         setShowDetail(false);
         if (!data.length) {
           showToast('Eşleşme bulunamadı.', 'error');
-        } else {
-          showToast(`${data.length} eşleşme bulundu.`, 'success');
         }
       } else if (activeTab === 'tarife' || activeTab === 'esya-fihristi') {
         const matchedIndices = results.map((row, index) => {
@@ -144,15 +140,14 @@ function App() {
         setTotalMatches(matchedIndices.length);
         setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
         if (matchedIndices.length > 0 && listRef.current) {
-          listRef.current.scrollToRow(matchedIndices[0]);
+          listRef.current.scrollToRow(matchedIndices[0], { align: 'center' });
         }
         if (!matchedIndices.length) {
           showToast('Eşleşme bulunamadı.', 'error');
-        } else {
-          showToast(`${matchedIndices.length} eşleşme bulundu.`, 'success');
         }
       }
     } catch (error) {
+      console.error('Arama hatası:', error);
       showToast(`Arama sırasında bir hata oluştu: ${error.message}`, 'error');
     } finally {
       setIsLoading(false);
@@ -179,7 +174,7 @@ function App() {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev + 1) % searchResultsIndices.length;
         if (listRef.current) {
-          listRef.current.scrollToRow(searchResultsIndices[newIndex]);
+          listRef.current.scrollToRow(searchResultsIndices[newIndex], { align: 'center' });
         }
         return newIndex;
       });
@@ -191,7 +186,7 @@ function App() {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev - 1 + searchResultsIndices.length) % searchResultsIndices.length;
         if (listRef.current) {
-          listRef.current.scrollToRow(searchResultsIndices[newIndex]);
+          listRef.current.scrollToRow(searchResultsIndices[newIndex], { align: 'center' });
         }
         return newIndex;
       });
@@ -253,7 +248,7 @@ function App() {
       <div className="header">
         <h1>Gümrük Tarife İstatistik Pozisyonu Arama Uygulaması</h1>
       </div>
-      
+
       <div className="tabs">
         {tabs.map((tab) => (
           <button
@@ -271,6 +266,14 @@ function App() {
         <div className="search-container">
           <label>{activeTabData.label}</label>
           <div className="search">
+            <button
+              onClick={previousMatch}
+              className="nav-button"
+              disabled={searchResultsIndices.length === 0}
+              title="Önceki eşleşme"
+            >
+              ◄
+            </button>
             <input
               ref={searchInputRef}
               value={query}
@@ -281,20 +284,21 @@ function App() {
             <button onClick={search} disabled={isLoading}>
               {isLoading ? 'Aranıyor...' : 'Ara'}
             </button>
+            <button
+              onClick={nextMatch}
+              className="nav-button"
+              disabled={searchResultsIndices.length === 0}
+              title="Sonraki eşleşme"
+            >
+              ►
+            </button>
           </div>
-        </div>
-
-        {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 0 && (
-          <div className="nav-container">
+          {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 0 && (
             <div className="match-info">
               {currentMatchIndex >= 0 ? currentMatchIndex + 1 : 0} / {totalMatches} eşleşme
             </div>
-            <div className="nav-buttons">
-              <button onClick={previousMatch} title="Önceki eşleşme">◄</button>
-              <button onClick={nextMatch} title="Sonraki eşleşme">►</button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {isLoading && <div className="loader"></div>}
 
