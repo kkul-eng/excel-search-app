@@ -215,12 +215,19 @@ label {
   padding: 20px;
   border-radius: 8px;
   background-color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
 }
 
 .list-container {
   border: 1px solid var(--border-color);
   border-radius: 6px;
   overflow: hidden;
+  width: 100%;
+  margin: 0 auto;
+  max-width: 1000px;
 }
 
 .treeview-header {
@@ -240,23 +247,24 @@ label {
 .header-cell.code {
   width: 150px;
   flex-shrink: 0;
+  padding-left: 10px;
 }
 
 .header-cell.description {
   flex: 1;
-  min-width: 300px; /* Daha geniş ve ayrık bir başlık */
-  padding-left: 20px; /* Başlıkları sola çek */
+  min-width: 300px;
+  padding-left: 20px;
 }
 
 .header-cell.item {
   width: 50%;
-  padding-left: 20px; /* Eşya Fihristi için de sola çek */
+  padding-left: 20px;
 }
 
 .header-cell.harmonized,
 .header-cell.notes {
   width: 25%;
-  padding-left: 20px; /* Daha fazla boşluk */
+  padding-left: 20px;
 }
 
 .row {
@@ -295,22 +303,23 @@ label {
   width: 150px;
   flex-shrink: 0;
   font-weight: 500;
+  padding-left: 10px;
 }
 
 .cell.description {
   flex: 1;
-  padding-left: 20px; /* Yazıları 15-20 karakter sola çek */
+  padding-left: 20px;
 }
 
 .cell.item {
   width: 50%;
-  padding-left: 20px; /* Eşya Fihristi için de sola çek */
+  padding-left: 20px;
 }
 
 .cell.harmonized,
 .cell.notes {
   width: 25%;
-  padding-left: 20px; /* Daha fazla boşluk */
+  padding-left: 20px;
 }
 
 .izahname-results {
@@ -455,6 +464,7 @@ label {
 
 .virtual-list {
   width: 100% !important;
+  margin: 0 auto !important;
   overflow-x: hidden !important;
 }
 
