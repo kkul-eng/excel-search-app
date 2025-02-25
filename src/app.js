@@ -68,12 +68,20 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTab]);
 
+  useEffect(() => {
+    if (isLoading) {
+      document.body.classList.add('is-loading');
+    } else {
+      document.body.classList.remove('is-loading');
+    }
+  }, [isLoading]);
+
   const showToast = (message, type = 'info') => {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.innerText = message;
     document.body.appendChild(toast);
-    
+
     setTimeout(() => {
       toast.className = `toast ${type} show`;
       setTimeout(() => {
