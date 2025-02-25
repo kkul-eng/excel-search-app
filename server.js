@@ -5,7 +5,7 @@ const fs = require('fs');
 const app = express();
 
 // React build dosyalarını sun
-const buildPath = path.join(__dirname, 'build');
+const buildPath = path.resolve(__dirname, 'build'); // Absolut yol için resolve kullanıyoruz
 console.log('Build dosyaları aranacak yol:', buildPath);
 app.use(express.static(buildPath));
 
@@ -46,12 +46,23 @@ const kelimeArama = (data, searchText, columns) => {
     return [];
   }
   if (/^\d+$/.test(searchText)) {
-    return data.filter(row => String(row[columns[0]] || '').startsWith(searchText));
+    return data.filter(row => {
+      const value = row[columns[0]];
+      return value !== undefined && value !== null && String(value).startsWith(searchText);
+    });
   } else {
     const searchKeywords = searchText.split(' ');
     return data.filter(row => {
-      const text = columns.map(col => turkceLower(row[col] || '')).join(' ');
-      return searchKeywords.every(keyword => text.includes(keyword));
+      try {
+        const text = columns.map(col => {
+          const value = row[col];
+          return value !== undefined && value !== null ? turkceLower(value) : '';
+        }).join(' ');
+        return searchKeywords.every(keyword => text.includes(keyword));
+      } catch (err) {
+        console.error('Kelime arama hatası, satır:', row, 'hata:', err);
+        return false;
+      }
     });
   }
 };
@@ -166,12 +177,12 @@ app.get('/api/esya-fihristi/search', (req, res) => {
 
 // Tüm diğer istekleri React’a yönlendir
 app.get('*', (req, res) => {
-  const indexPath = path.join(__dirname, 'build', 'index.html');
+  const indexPath = path.resolve(__dirname, 'build', 'index.html');
   console.log('index.html gönderiliyor, yol:', indexPath);
   fs.access(indexPath, fs.constants.F_OK, (err) => {
     if (err) {
       console.error('index.html bulunamadı:', err);
-      res.status(500).send('Sunucu hatası: index.html bulunamadı');
+      res.status(500).send('Sunucu hatası: index.html bulunamadı. Build işlemi doğru çalışmamış olabilir.');
       return;
     }
     res.sendFile(indexPath, (err) => {
