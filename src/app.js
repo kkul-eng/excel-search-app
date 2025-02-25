@@ -11,6 +11,8 @@ function App() {
   const [detailResults, setDetailResults] = useState([]);
   const [showDetail, setShowDetail] = useState(false);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [totalMatches, setTotalMatches] = useState(0);
   const searchInputRef = useRef(null);
   const listRef = useRef(null);
 
@@ -26,10 +28,10 @@ function App() {
     return result.toLowerCase();
   };
 
-  // Açılışta veri yükleme
   useEffect(() => {
     const loadInitialData = async () => {
       try {
+        setIsLoading(true);
         let response;
         if (activeTab === 'tarife') {
           response = await axios.get('/api/tarife/all');
@@ -44,16 +46,18 @@ function App() {
           setSearchResultsIndices([]);
           setCurrentMatchIndex(-1);
         } else {
-          setResults([]); // GTİP ve İzahname açılışta boş
+          setResults([]);
           console.log(`${activeTab} sekmesi açılışta boş bırakıldı`);
         }
       } catch (error) {
         console.error('Veri yüklenirken hata:', error);
+        showToast('Veri yüklenirken bir hata oluştu.', 'error');
+      } finally {
+        setIsLoading(false);
       }
     };
     loadInitialData();
 
-    // Ctrl + F ile input’a odaklanma (GTİP hariç)
     const handleKeyDown = (e) => {
       if (e.ctrlKey && e.key === 'f' && activeTab !== 'gtip') {
         e.preventDefault();
@@ -64,13 +68,31 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTab]);
 
+  const showToast = (message, type = 'info') => {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerText = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.className = `toast ${type} show`;
+      setTimeout(() => {
+        toast.className = `toast ${type}`;
+        setTimeout(() => {
+          document.body.removeChild(toast);
+        }, 300);
+      }, 2500);
+    }, 100);
+  };
+
   const search = async () => {
     if (!query.trim()) {
-      alert('Lütfen geçerli bir kelime veya ifade girin.');
+      showToast('Lütfen geçerli bir kelime veya ifade girin.', 'error');
       return;
     }
 
     try {
+      setIsLoading(true);
       const response = await axios.get(`/api/${activeTab}/search`, {
         params: { query },
       });
@@ -83,7 +105,9 @@ function App() {
         setCurrentMatchIndex(-1);
         setShowDetail(false);
         if (!data.length) {
-          alert('Eşleşme bulunamadı.');
+          showToast('Eşleşme bulunamadı.', 'error');
+        } else {
+          showToast(`${data.length} eşleşme bulundu.`, 'success');
         }
       } else if (activeTab === 'izahname') {
         setResults(data);
@@ -91,10 +115,11 @@ function App() {
         setCurrentMatchIndex(-1);
         setShowDetail(false);
         if (!data.length) {
-          alert('Eşleşme bulunamadı.');
+          showToast('Eşleşme bulunamadı.', 'error');
+        } else {
+          showToast(`${data.length} eşleşme bulundu.`, 'success');
         }
       } else if (activeTab === 'tarife' || activeTab === 'esya-fihristi') {
-        // Tam veriyi koru, sadece eşleşmeleri işaretle
         const matchedIndices = results.map((row, index) => {
           if (activeTab === 'tarife') {
             const col1 = turkceLower(row['1. Kolon'] || '');
@@ -108,29 +133,36 @@ function App() {
           }
         }).filter(index => index !== -1);
         setSearchResultsIndices(matchedIndices);
+        setTotalMatches(matchedIndices.length);
         setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
-        setShowDetail(false);
         if (matchedIndices.length > 0 && listRef.current) {
-          listRef.current.scrollToRow(matchedIndices[0]); // İlk eşleşmeye kaydır
+          listRef.current.scrollToRow(matchedIndices[0]);
         }
         if (!matchedIndices.length) {
-          alert('Eşleşme bulunamadı.');
+          showToast('Eşleşme bulunamadı.', 'error');
+        } else {
+          showToast(`${matchedIndices.length} eşleşme bulundu.`, 'success');
         }
       }
     } catch (error) {
-      alert(`Arama sırasında bir hata oluştu: ${error.message}`);
+      showToast(`Arama sırasında bir hata oluştu: ${error.message}`, 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const fetchDetail = async (index) => {
     try {
+      setIsLoading(true);
       const response = await axios.get('/api/izahname/context', {
         params: { index },
       });
       setDetailResults(response.data);
       setShowDetail(true);
     } catch (error) {
-      alert(`Detay alınırken hata oluştu: ${error.message}`);
+      showToast(`Detay alınırken hata oluştu: ${error.message}`, 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -165,6 +197,7 @@ function App() {
     setQuery('');
     setShowDetail(false);
     setCurrentMatchIndex(-1);
+    setTotalMatches(0);
   };
 
   const tabs = [
@@ -179,26 +212,28 @@ function App() {
   const rowRenderer = ({ index, key, style }) => {
     const row = results[index];
     const isHighlighted = searchResultsIndices[currentMatchIndex] === index;
+    const isMatch = searchResultsIndices.includes(index);
+
     if (activeTab === 'gtip') {
       return (
         <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : ''}`}>
-          <div style={{ width: '100px' }}>{row.Kod || ''}</div>
-          <div style={{ width: '900px' }}>{row.Tanım || ''}</div>
+          <div className="cell code">{row.Kod || ''}</div>
+          <div className="cell description">{row.Tanım || ''}</div>
         </div>
       );
     } else if (activeTab === 'tarife') {
       return (
-        <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : ''}`}>
-          <div style={{ width: '100px' }}>{row['1. Kolon'] || ''}</div>
-          <div style={{ width: '900px' }}>{row['2. Kolon'] || ''}</div>
+        <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`}>
+          <div className="cell code">{row['1. Kolon'] || ''}</div>
+          <div className="cell description">{row['2. Kolon'] || ''}</div>
         </div>
       );
     } else if (activeTab === 'esya-fihristi') {
       return (
-        <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : ''}`}>
-          <div style={{ width: '800px' }}>{row['Eşya'] || ''}</div>
-          <div style={{ width: '200px' }}>{row['Armonize Sistem'] || ''}</div>
-          <div style={{ width: '200px' }}>{row['İzahname Notları'] || ''}</div>
+        <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`}>
+          <div className="cell item">{row['Eşya'] || ''}</div>
+          <div className="cell harmonized">{row['Armonize Sistem'] || ''}</div>
+          <div className="cell notes">{row['İzahname Notları'] || ''}</div>
         </div>
       );
     }
@@ -207,6 +242,10 @@ function App() {
 
   return (
     <div className="app">
+      <div className="header">
+        <h1>Gümrük Tarife İstatistik Pozisyonu Arama Uygulaması</h1>
+      </div>
+      
       <div className="tabs">
         {tabs.map((tab) => (
           <button
@@ -220,50 +259,67 @@ function App() {
       </div>
 
       <div className="content">
-        <h1>{activeTabData.name}</h1>
-        <label>{activeTabData.label}</label>
-        <div className="search">
-          <input
-            ref={searchInputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && search()}
-            placeholder={activeTab === 'gtip' ? 'Arama yapın...' : 'Arama yapın (Ctrl + F ile odaklan)'}
-          />
-          <button onClick={search}>Ara</button>
+        <h2>{activeTabData.name}</h2>
+        <div className="search-container">
+          <label>{activeTabData.label}</label>
+          <div className="search">
+            <input
+              ref={searchInputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && search()}
+              placeholder={activeTab === 'gtip' ? 'Arama yapın...' : 'Arama yapın (Ctrl + F ile odaklan)'}
+            />
+            <button onClick={search} disabled={isLoading}>
+              {isLoading ? 'Aranıyor...' : 'Ara'}
+            </button>
+          </div>
         </div>
 
         {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 0 && (
-          <div className="nav-buttons">
-            <button onClick={previousMatch}>◄</button>
-            <button onClick={nextMatch}>►</button>
+          <div className="nav-container">
+            <div className="match-info">
+              {currentMatchIndex >= 0 ? currentMatchIndex + 1 : 0} / {totalMatches} eşleşme
+            </div>
+            <div className="nav-buttons">
+              <button onClick={previousMatch} title="Önceki eşleşme">◄</button>
+              <button onClick={nextMatch} title="Sonraki eşleşme">►</button>
+            </div>
           </div>
         )}
 
-        {showDetail ? (
-          <div className="results">
-            <h2>İzahname Detay</h2>
-            {detailResults.map((result, index) => (
-              <p key={index} className={result.isBold ? 'bold' : ''}>
-                {result.paragraph || ''}
-              </p>
-            ))}
-            <button onClick={() => setShowDetail(false)}>Geri Dön</button>
+        {isLoading && <div className="loader"></div>}
+
+        {!isLoading && showDetail ? (
+          <div className="results izahname-detail">
+            <h3>İzahname Detay</h3>
+            <div className="detail-container">
+              {detailResults.map((result, index) => (
+                <p key={index} className={result.isBold ? 'bold' : ''}>
+                  {result.paragraph || ''}
+                </p>
+              ))}
+            </div>
+            <button onClick={() => setShowDetail(false)} className="back-button">
+              <span>←</span> Geri Dön
+            </button>
           </div>
         ) : (
           <div className="results">
             {activeTab === 'gtip' && results.length > 0 && (
-              <div>
+              <div className="list-container">
                 <div className="treeview-header">
-                  <div style={{ width: '100px' }}>Kod</div>
-                  <div style={{ width: '900px' }}>Tanım</div>
+                  <div className="header-cell code">Kod</div>
+                  <div className="header-cell description">Tanım</div>
                 </div>
                 <List
+                  ref={listRef}
                   width={1000}
                   height={400}
                   rowCount={results.length}
-                  rowHeight={25}
+                  rowHeight={30}
                   rowRenderer={rowRenderer}
+                  className="virtual-list"
                 />
               </div>
             )}
@@ -272,51 +328,57 @@ function App() {
               <div className="izahname-results">
                 {results.map((r, i) => (
                   <div key={i} className="izahname-result">
-                    {r.paragraph || ''}{' '}
-                    <span className="detail-link" onClick={() => fetchDetail(r.index)}>
+                    <p>{r.paragraph || ''}</p>
+                    <button onClick={() => fetchDetail(r.index)} className="detail-button">
                       Detay...
-                    </span>
+                    </button>
                   </div>
                 ))}
               </div>
             )}
 
             {activeTab === 'tarife' && results.length > 0 && (
-              <div>
+              <div className="list-container">
                 <div className="treeview-header">
-                  <div style={{ width: '100px' }}>1. Kolon</div>
-                  <div style={{ width: '900px' }}>2. Kolon</div>
+                  <div className="header-cell code">1. Kolon</div>
+                  <div className="header-cell description">2. Kolon</div>
                 </div>
                 <List
                   ref={listRef}
                   width={1000}
                   height={400}
                   rowCount={results.length}
-                  rowHeight={25}
+                  rowHeight={30}
                   rowRenderer={rowRenderer}
+                  className="virtual-list"
                 />
               </div>
             )}
 
             {activeTab === 'esya-fihristi' && results.length > 0 && (
-              <div>
+              <div className="list-container">
                 <div className="treeview-header">
-                  <div style={{ width: '800px' }}>Eşya</div>
-                  <div style={{ width: '200px' }}>Armonize Sistem</div>
-                  <div style={{ width: '200px' }}>İzahname Notları</div>
+                  <div className="header-cell item">Eşya</div>
+                  <div className="header-cell harmonized">Armonize Sistem</div>
+                  <div className="header-cell notes">İzahname Notları</div>
                 </div>
                 <List
                   ref={listRef}
-                  width={1200}
+                  width={1000}
                   height={400}
                   rowCount={results.length}
-                  rowHeight={25}
+                  rowHeight={30}
                   rowRenderer={rowRenderer}
+                  className="virtual-list"
                 />
               </div>
             )}
           </div>
         )}
+      </div>
+
+      <div className="footer">
+        <p>© {new Date().getFullYear()} Gümrük Tarife Arama Uygulaması</p>
       </div>
     </div>
   );
