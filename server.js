@@ -5,7 +5,7 @@ const fs = require('fs');
 const app = express();
 
 // React build dosyalarını sun
-const buildPath = path.resolve(__dirname, 'build'); // Absolut yol için resolve kullanıyoruz
+const buildPath = path.resolve(__dirname, 'build');
 console.log('Build dosyaları aranacak yol:', buildPath);
 app.use(express.static(buildPath));
 
@@ -127,8 +127,9 @@ app.get('/api/izahname/context', (req, res) => {
 
 // Tarife tüm veri endpoint’i
 app.get('/api/tarife/all', (req, res) => {
-  console.log('Tarife tüm veri isteği alındı, satır sayısı:', tarifeData.length);
+  console.log('Tarife tüm veri isteği alındı, satır sayısı:', tarifeData?.length || 0);
   try {
+    if (!tarifeData) throw new Error('Tarife verisi yüklenmedi');
     res.json(tarifeData);
   } catch (error) {
     console.error('Tarife tüm veri hatası:', error);
@@ -152,8 +153,9 @@ app.get('/api/tarife/search', (req, res) => {
 
 // Eşya Fihristi tüm veri endpoint’i
 app.get('/api/esya-fihristi/all', (req, res) => {
-  console.log('Eşya Fihristi tüm veri isteği alındı, satır sayısı:', esyaFihristiData.length);
+  console.log('Eşya Fihristi tüm veri isteği alındı, satır sayısı:', esyaFihristiData?.length || 0);
   try {
+    if (!esyaFihristiData) throw new Error('Eşya Fihristi verisi yüklenmedi');
     res.json(esyaFihristiData);
   } catch (error) {
     console.error('Eşya Fihristi tüm veri hatası:', error);
@@ -166,6 +168,7 @@ app.get('/api/esya-fihristi/search', (req, res) => {
   const query = turkceLower(req.query.query || '');
   console.log('Eşya Fihristi arama sorgusu:', query);
   try {
+    if (!esyaFihristiData) throw new Error('Eşya Fihristi verisi yüklenmedi');
     const results = kelimeArama(esyaFihristiData, query, ['Eşya', 'Armonize Sistem', 'İzahname Notları']);
     console.log('Eşya Fihristi arama sonuçları:', results.length);
     res.json(results);
