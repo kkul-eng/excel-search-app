@@ -168,6 +168,7 @@ label {
   cursor: pointer;
   transition: background-color 0.2s;
   min-width: 120px;
+  font-family: 'Arial', sans-serif;
 }
 
 .search button:hover {
@@ -179,45 +180,35 @@ label {
   cursor: not-allowed;
 }
 
-.nav-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+.nav-button {
+  width: 50px;
+  height: 40px;
   background-color: var(--primary-color);
-  padding: 10px 15px;
-  border-radius: 6px;
   color: white;
+  border: 2px solid var(--primary-dark);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: bold;
+  font-family: 'Arial', sans-serif;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.nav-button:hover:not(:disabled) {
+  background-color: var(--primary-dark);
+}
+
+.nav-button:disabled {
+  background-color: var(--border-color);
+  cursor: not-allowed;
 }
 
 .match-info {
   font-size: 14px;
   font-weight: 500;
-}
-
-.nav-buttons {
-  display: flex;
-  gap: 10px;
-}
-
-.nav-buttons button {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: white;
-  color: var(--primary-color);
-  border: none;
-  border-radius: 50%;
-  font-size: 16px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.nav-buttons button:hover {
-  background-color: var(--primary-dark);
-  color: white;
+  text-align: center;
+  margin-top: 10px;
+  color: var(--light-text);
 }
 
 .results {
@@ -476,8 +467,9 @@ label {
     width: 100%;
   }
   
-  .search button {
+  .search button, .nav-button {
     width: 100%;
+    margin: 5px 0;
   }
   
   .header h1 {
