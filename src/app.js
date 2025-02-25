@@ -51,7 +51,7 @@ function App() {
         }
       } catch (error) {
         console.error('Veri yüklenirken hata:', error);
-        showToast('Veri yüklenirken bir hata oluştu.', 'error');
+        showToast('Veri yüklenirken bir hata oluştu: ' + error.message, 'error');
       } finally {
         setIsLoading(false);
       }
@@ -266,32 +266,36 @@ function App() {
         <div className="search-container">
           <label>{activeTabData.label}</label>
           <div className="search">
-            <button
-              onClick={previousMatch}
-              className="nav-button"
-              disabled={searchResultsIndices.length === 0}
-              title="Önceki eşleşme"
-            >
-              ◄
-            </button>
+            {['tarife', 'esya-fihristi'].includes(activeTab) && (
+              <button
+                onClick={previousMatch}
+                className="nav-button"
+                disabled={searchResultsIndices.length <= 1}
+                title="Önceki eşleşme"
+              >
+                ◄
+              </button>
+            )}
             <input
               ref={searchInputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && search()}
-              placeholder={activeTab === 'gtip' ? 'Arama yapın...' : 'Arama yapın (Ctrl + F ile odaklan)'}
+              placeholder="Arama yapın..."
             />
             <button onClick={search} disabled={isLoading}>
               {isLoading ? 'Aranıyor...' : 'Ara'}
             </button>
-            <button
-              onClick={nextMatch}
-              className="nav-button"
-              disabled={searchResultsIndices.length === 0}
-              title="Sonraki eşleşme"
-            >
-              ►
-            </button>
+            {['tarife', 'esya-fihristi'].includes(activeTab) && (
+              <button
+                onClick={nextMatch}
+                className="nav-button"
+                disabled={searchResultsIndices.length <= 1}
+                title="Sonraki eşleşme"
+              >
+                ►
+              </button>
+            )}
           </div>
           {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 0 && (
             <div className="match-info">
