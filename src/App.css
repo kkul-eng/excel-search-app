@@ -250,7 +250,8 @@ label {
   width: 50%;
 }
 
-.header-cell.harmonized, .header-cell.notes {
+.header-cell.harmonized,
+.header-cell.notes {
   width: 25%;
 }
 
@@ -300,7 +301,8 @@ label {
   width: 50%;
 }
 
-.cell.harmonized, .cell.notes {
+.cell.harmonized,
+.cell.notes {
   width: 25%;
 }
 
@@ -406,7 +408,9 @@ label {
 }
 
 @keyframes spin {
-  to { transform: translate(-50%, -50%) rotate(360deg); }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
 }
 
 .toast {
@@ -451,47 +455,52 @@ label {
   .tabs {
     flex-wrap: wrap;
   }
-  
+
   .tab {
     flex: 1 0 50%;
     text-align: center;
     font-size: 14px;
     padding: 10px;
   }
-  
+
   .search {
     flex-direction: column;
   }
-  
+
   .search input {
     width: 100%;
   }
-  
-  .search button, .nav-button {
+
+  .search button,
+  .nav-button {
     width: 100%;
     margin: 5px 0;
   }
-  
+
   .header h1 {
     font-size: 20px;
   }
-  
+
   .content {
     padding: 15px;
     margin-top: 10px;
     margin-bottom: 10px;
   }
-  
-  .cell.harmonized, .header-cell.harmonized,
-  .cell.notes, .header-cell.notes {
+
+  .cell.harmonized,
+  .header-cell.harmonized,
+  .cell.notes,
+  .header-cell.notes {
     display: none;
   }
-  
-  .cell.item, .header-cell.item {
+
+  .cell.item,
+  .header-cell.item {
     width: 70%;
   }
-  
-  .virtual-list, .list-container {
+
+  .virtual-list,
+  .list-container {
     width: 100% !important;
   }
 }
