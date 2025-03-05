@@ -184,6 +184,6 @@ app.get('/api/esya-fihristi/search', (req, res) => {
 
 // Sunucu başlatma
 const port = 3001;
-app.listen(port, () => {
-  console.log(`Sunucu ${port} portunda çalışıyor...`);
+app.listen(3001, '0.0.0.0', () => {
+  console.log('Sunucu 3001 portunda çalışıyor...');
 });
