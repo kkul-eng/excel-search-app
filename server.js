@@ -11,18 +11,23 @@ app.use(express.static(buildPath));
 
 // Excel dosyalarını bir kez oku ve önbellekte tut
 let gtipData, izahnameData, tarifeData, esyaFihristiData;
-try {
-  gtipData = XLSX.utils.sheet_to_json(XLSX.readFile('gtip.xls').Sheets[XLSX.readFile('gtip.xls').SheetNames[0]], { defval: '' });
-  console.log('gtipData yüklendi:', gtipData.length, 'satır, sütunlar:', Object.keys(gtipData[0] || {}));
-  izahnameData = XLSX.utils.sheet_to_json(XLSX.readFile('izahname.xlsx').Sheets[XLSX.readFile('izahname.xlsx').SheetNames[0]], { defval: '' });
-  console.log('izahnameData yüklendi:', izahnameData.length, 'satır, sütunlar:', Object.keys(izahnameData[0] || {}));
-  tarifeData = XLSX.utils.sheet_to_json(XLSX.readFile('index.xlsx').Sheets[XLSX.readFile('index.xlsx').SheetNames[0]], { defval: '' });
-  console.log('tarifeData yüklendi:', tarifeData.length, 'satır, sütunlar:', Object.keys(tarifeData[0] || {}));
-  esyaFihristiData = XLSX.utils.sheet_to_json(XLSX.readFile('alfabetik_fihrist.xlsx').Sheets[XLSX.readFile('alfabetik_fihrist.xlsx').SheetNames[0]], { defval: '' });
-  console.log('esyaFihristiData yüklendi:', esyaFihristiData.length, 'satır, sütunlar:', Object.keys(esyaFihristiData[0] || {}));
-} catch (error) {
-  console.error('Excel dosyaları yüklenirken hata:', error);
-}
+const loadData = () => {
+  try {
+    gtipData = XLSX.utils.sheet_to_json(XLSX.readFile(path.resolve(__dirname, 'gtip.xls')).Sheets[XLSX.readFile('gtip.xls').SheetNames[0]], { defval: '' });
+    console.log('gtipData yüklendi:', gtipData.length, 'satır, sütunlar:', Object.keys(gtipData[0] || {}));
+    izahnameData = XLSX.utils.sheet_to_json(XLSX.readFile(path.resolve(__dirname, 'izahname.xlsx')).Sheets[XLSX.readFile('izahname.xlsx').SheetNames[0]], { defval: '' });
+    console.log('izahnameData yüklendi:', izahnameData.length, 'satır, sütunlar:', Object.keys(izahnameData[0] || {}));
+    tarifeData = XLSX.utils.sheet_to_json(XLSX.readFile(path.resolve(__dirname, 'index.xlsx')).Sheets[XLSX.readFile('index.xlsx').SheetNames[0]], { defval: '' });
+    console.log('tarifeData yüklendi:', tarifeData.length, 'satır, sütunlar:', Object.keys(tarifeData[0] || {}));
+    esyaFihristiData = XLSX.utils.sheet_to_json(XLSX.readFile(path.resolve(__dirname, 'alfabetik_fihrist.xlsx')).Sheets[XLSX.readFile('alfabetik_fihrist.xlsx').SheetNames[0]], { defval: '' });
+    console.log('esyaFihristiData yüklendi:', esyaFihristiData.length, 'satır, sütunlar:', Object.keys(esyaFihristiData[0] || {}));
+  } catch (error) {
+    console.error('Excel dosyaları yüklenirken hata:', error);
+  }
+};
+
+// İlk başta verileri yükle
+loadData();
 
 // Türkçe lowercase dönüşümü
 const turkceLower = (text) => {
@@ -168,8 +173,7 @@ app.get('/api/esya-fihristi/search', (req, res) => {
   const query = turkceLower(req.query.query || '');
   console.log('Eşya Fihristi arama sorgusu:', query);
   try {
-    if (!esyaFihristiData) throw new Error('Eşya Fihristi verisi yüklenmedi');
-    const results = kelimeArama(esyaFihristiData, query, ['Eşya', 'Armonize Sistem', 'İzahname Notları']);
+    const results = kelimeArama(esyaFihristiData, query, ['Kod', 'Tanım']);
     console.log('Eşya Fihristi arama sonuçları:', results.length);
     res.json(results);
   } catch (error) {
@@ -178,26 +182,8 @@ app.get('/api/esya-fihristi/search', (req, res) => {
   }
 });
 
-// Tüm diğer istekleri React’a yönlendir
-app.get('*', (req, res) => {
-  const indexPath = path.resolve(__dirname, 'build', 'index.html');
-  console.log('index.html gönderiliyor, yol:', indexPath);
-  fs.access(indexPath, fs.constants.F_OK, (err) => {
-    if (err) {
-      console.error('index.html bulunamadı:', err);
-      res.status(500).send('Sunucu hatası: index.html bulunamadı. Build işlemi doğru çalışmamış olabilir.');
-      return;
-    }
-    res.sendFile(indexPath, (err) => {
-      if (err) {
-        console.error('index.html gönderilirken hata:', err);
-        res.status(500).send('Sunucu hatası');
-      }
-    });
-  });
-});
-
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+// Sunucu başlatma
+const port = 3001;
+app.listen(port, () => {
+  console.log(`Sunucu ${port} portunda çalışıyor...`);
 });
