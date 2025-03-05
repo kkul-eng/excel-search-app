@@ -15,6 +15,10 @@ function App() {
   const [totalMatches, setTotalMatches] = useState(0);
   const searchInputRef = useRef(null);
   const listRef = useRef(null);
+<<<<<<< HEAD
+=======
+  const [listHeight, setListHeight] = useState(400);
+>>>>>>> a1877a4e22fe8ef8246af234f3399654382ff3d1
 
   const turkceLower = (text) => {
     if (!text) return '';
@@ -66,7 +70,24 @@ function App() {
       }
     };
     window.addEventListener('keydown', handleKeyDown);
+<<<<<<< HEAD
     return () => window.removeEventListener('keydown', handleKeyDown);
+=======
+    
+    // Liste boyutunu ayarla
+    setListHeight(window.innerHeight * 0.6);
+    
+    const handleResize = () => {
+      setListHeight(window.innerHeight * 0.6);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', handleResize);
+    };
+>>>>>>> a1877a4e22fe8ef8246af234f3399654382ff3d1
   }, [activeTab]);
 
   useEffect(() => {
@@ -93,6 +114,24 @@ function App() {
       }, 2500);
     }, 100);
   };
+<<<<<<< HEAD
+=======
+
+  const scrollToRowWithAlignment = (index) => {
+    if (listRef.current) {
+      // Önce merkeze kaydır
+      listRef.current.scrollToRow(index);
+      
+      // Ardından DOM güncellendikten sonra pozisyonu kontrol et ve gerekirse yeniden ayarla
+      setTimeout(() => {
+        const list = listRef.current;
+        if (list) {
+          list.scrollToRow(index);
+        }
+      }, 50);
+    }
+  };
+>>>>>>> a1877a4e22fe8ef8246af234f3399654382ff3d1
 
   const search = async () => {
     if (!query.trim()) {
@@ -145,8 +184,13 @@ function App() {
         setSearchResultsIndices(matchedIndices);
         setTotalMatches(matchedIndices.length);
         setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
+<<<<<<< HEAD
         if (matchedIndices.length > 0 && listRef.current) {
           listRef.current.scrollToRow(matchedIndices[0], { align: 'center' });
+=======
+        if (matchedIndices.length > 0) {
+          scrollToRowWithAlignment(matchedIndices[0]);
+>>>>>>> a1877a4e22fe8ef8246af234f3399654382ff3d1
         }
         if (!matchedIndices.length) {
           showToast('Eşleşme bulunamadı.', 'error');
@@ -179,9 +223,13 @@ function App() {
     if (searchResultsIndices.length > 0) {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev + 1) % searchResultsIndices.length;
+<<<<<<< HEAD
         if (listRef.current) {
           listRef.current.scrollToRow(searchResultsIndices[newIndex], { align: 'center' });
         }
+=======
+        scrollToRowWithAlignment(searchResultsIndices[newIndex]);
+>>>>>>> a1877a4e22fe8ef8246af234f3399654382ff3d1
         return newIndex;
       });
     }
@@ -191,9 +239,13 @@ function App() {
     if (searchResultsIndices.length > 0) {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev - 1 + searchResultsIndices.length) % searchResultsIndices.length;
+<<<<<<< HEAD
         if (listRef.current) {
           listRef.current.scrollToRow(searchResultsIndices[newIndex], { align: 'center' });
         }
+=======
+        scrollToRowWithAlignment(searchResultsIndices[newIndex]);
+>>>>>>> a1877a4e22fe8ef8246af234f3399654382ff3d1
         return newIndex;
       });
     }
@@ -348,11 +400,19 @@ function App() {
                 <List
                   ref={listRef}
                   width={Math.min(1000, window.innerWidth - 40)}
+<<<<<<< HEAD
                   height={400}
+=======
+                  height={listHeight}
+>>>>>>> a1877a4e22fe8ef8246af234f3399654382ff3d1
                   rowCount={results.length}
                   rowHeight={30}
                   rowRenderer={rowRenderer}
                   className="virtual-list"
+<<<<<<< HEAD
+=======
+                  scrollToAlignment="center"
+>>>>>>> a1877a4e22fe8ef8246af234f3399654382ff3d1
                 />
               </div>
             )}
@@ -379,11 +439,19 @@ function App() {
                 <List
                   ref={listRef}
                   width={Math.min(1000, window.innerWidth - 40)}
+<<<<<<< HEAD
                   height={400}
+=======
+                  height={listHeight}
+>>>>>>> a1877a4e22fe8ef8246af234f3399654382ff3d1
                   rowCount={results.length}
                   rowHeight={30}
                   rowRenderer={rowRenderer}
                   className="virtual-list"
+<<<<<<< HEAD
+=======
+                  scrollToAlignment="center"
+>>>>>>> a1877a4e22fe8ef8246af234f3399654382ff3d1
                 />
               </div>
             )}
@@ -398,11 +466,19 @@ function App() {
                 <List
                   ref={listRef}
                   width={Math.min(1000, window.innerWidth - 40)}
+<<<<<<< HEAD
                   height={400}
+=======
+                  height={listHeight}
+>>>>>>> a1877a4e22fe8ef8246af234f3399654382ff3d1
                   rowCount={results.length}
                   rowHeight={30}
                   rowRenderer={rowRenderer}
                   className="virtual-list"
+<<<<<<< HEAD
+=======
+                  scrollToAlignment="center"
+>>>>>>> a1877a4e22fe8ef8246af234f3399654382ff3d1
                 />
               </div>
             )}
