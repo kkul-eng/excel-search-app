@@ -128,6 +128,7 @@ function App() {
         params: { query },
       });
       const data = response.data;
+      console.log('API Response:', data); // Debug log
 
       if (activeTab === 'gtip') {
         setResults(data);
@@ -138,14 +139,16 @@ function App() {
           showToast('Eşleşme bulunamadı.', 'error');
         }
       } else if (activeTab === 'izahname') {
-        setResults(data.map(item => ({
-          index: item.index,
-          paragraph: item.Text
-        })));
+        const formattedResults = data.map(item => ({
+          index: item.index || item.Index || null,
+          paragraph: item.Text || item.paragraph || item.paragraf || 'No paragraph data'
+        }));
+        console.log('Formatted Izahname Results:', formattedResults); // Debug log
+        setResults(formattedResults);
         setSearchResultsIndices([]);
         setCurrentMatchIndex(-1);
         setShowDetail(false);
-        if (!data.length) {
+        if (!formattedResults.length) {
           showToast('Eşleşme bulunamadı.', 'error');
         }
       } else if (activeTab === 'tarife' || activeTab === 'esya-fihristi') {
@@ -190,10 +193,12 @@ function App() {
       const response = await axios.get('/api/izahname/context', {
         params: { index },
       });
-      setDetailResults(response.data.map(item => ({
-        paragraph: item.Text,
+      const formattedDetail = response.data.map(item => ({
+        paragraph: item.Text || item.paragraph || item.paragraf || 'No context data',
         isBold: item.index === index
-      })));
+      }));
+      console.log('Formatted Detail Results:', formattedDetail); // Debug log
+      setDetailResults(formattedDetail);
       setShowDetail(true);
     } catch (error) {
       showToast(`Detay alınırken hata oluştu: ${error.message}`, 'error');
@@ -331,11 +336,15 @@ function App() {
           <div className="results izahname-detail">
             <h3>İzahname Sayfası</h3>
             <div className="detail-container">
-              {detailResults.map((result, index) => (
-                <p key={index} className={result.isBold ? 'bold' : ''}>
-                  {result.paragraph || ''}
-                </p>
-              ))}
+              {detailResults.length > 0 ? (
+                detailResults.map((result, index) => (
+                  <p key={index} className={result.isBold ? 'bold' : ''}>
+                    {result.paragraph}
+                  </p>
+                ))
+              ) : (
+                <p>Detay verisi bulunamadı.</p>
+              )}
             </div>
             <button onClick={() => setShowDetail(false)} className="back-button">
               <span>←</span> Geri Dön
@@ -362,19 +371,27 @@ function App() {
               </div>
             )}
 
-            {activeTab === 'izahname' && results.length > 0 && (
+            {activeTab === 'izahname' && (
               <div className="izahname-results">
                 <h3>İlgili Paragraflar</h3>
-                {results.map((result, index) => (
-                  <div
-                    key={index}
-                    className="izahname-item"
-                    onClick={() => fetchDetail(result.index)}
-                  >
-                    <div className="izahname-text">{result.paragraph}</div>
-                    <div className="izahname-detail-link">Detay...</div>
+                {results.length > 0 ? (
+                  results.map((result, index) => (
+                    <div
+                      key={index}
+                      className="izahname-item"
+                      onClick={() => result.index !== null && fetchDetail(result.index)}
+                    >
+                      <div className="izahname-text">{result.paragraph}</div>
+                      {result.index !== null && (
+                        <div className="izahname-detail-link">Detay...</div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="no-results">
+                    Arama sonucu bulunamadı. Lütfen arama kriterlerinizi değiştirin.
                   </div>
-                ))}
+                )}
               </div>
             )}
 
@@ -407,7 +424,7 @@ function App() {
               </div>
             )}
 
-            {results.length === 0 && !isLoading && (
+            {(activeTab !== 'izahname' && results.length === 0 && !isLoading) && (
               <div className="no-results">
                 Arama sonucu bulunamadı. Lütfen arama kriterlerinizi değiştirin.
               </div>
