@@ -36,21 +36,20 @@ function App() {
         setIsLoading(true);
         let response;
         if (activeTab === 'tarife') {
-          response = await axios.get('/api/tarife/all');
+          response = await axios.get('/api/tarife/all', { timeout: 10000 }); // 10s timeout
           setResults(response.data);
-          setSearchResultsIndices([]);
-          setCurrentMatchIndex(-1);
         } else if (activeTab === 'esya-fihristi') {
-          response = await axios.get('/api/esya-fihristi/all');
+          response = await axios.get('/api/esya-fihristi/all', { timeout: 10000 });
           setResults(response.data);
-          setSearchResultsIndices([]);
-          setCurrentMatchIndex(-1);
         } else {
           setResults([]);
         }
+        setSearchResultsIndices([]);
+        setCurrentMatchIndex(-1);
       } catch (error) {
-        console.error('Veri yüklenirken hata:', error);
-        showToast('Veri yüklenirken bir hata oluştu: ' + error.message, 'error');
+        console.error('Initial data load error:', error);
+        showToast(`Veri yüklenemedi: ${error.message || 'Bağlantı hatası'}`, 'error');
+        setResults([]);
       } finally {
         setIsLoading(false);
       }
@@ -60,19 +59,15 @@ function App() {
     const handleKeyDown = (e) => {
       if (e.ctrlKey && e.key === 'f' && activeTab !== 'gtip') {
         e.preventDefault();
-        searchInputRef.current.focus();
+        searchInputRef.current?.focus();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    
+
     setListHeight(window.innerHeight * 0.6);
-    
-    const handleResize = () => {
-      setListHeight(window.innerHeight * 0.6);
-    };
-    
+    const handleResize = () => setListHeight(window.innerHeight * 0.6);
     window.addEventListener('resize', handleResize);
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('resize', handleResize);
@@ -80,11 +75,7 @@ function App() {
   }, [activeTab]);
 
   useEffect(() => {
-    if (isLoading) {
-      document.body.classList.add('is-loading');
-    } else {
-      document.body.classList.remove('is-loading');
-    }
+    document.body.classList.toggle('is-loading', isLoading);
   }, [isLoading]);
 
   const showToast = (message, type = 'info') => {
@@ -97,9 +88,7 @@ function App() {
       toast.className = `toast ${type} show`;
       setTimeout(() => {
         toast.className = `toast ${type}`;
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 300);
+        setTimeout(() => document.body.removeChild(toast), 300);
       }, 2500);
     }, 100);
   };
@@ -107,12 +96,7 @@ function App() {
   const scrollToRowWithAlignment = (index) => {
     if (listRef.current) {
       listRef.current.scrollToRow(index);
-      setTimeout(() => {
-        const list = listRef.current;
-        if (list) {
-          list.scrollToRow(index);
-        }
-      }, 50);
+      setTimeout(() => listRef.current?.scrollToRow(index), 50);
     }
   };
 
@@ -126,31 +110,26 @@ function App() {
       setIsLoading(true);
       const response = await axios.get(`/api/${activeTab}/search`, {
         params: { query },
+        timeout: 10000, // 10s timeout
       });
       const data = response.data;
-      console.log('API Response:', data); // Debug log
 
       if (activeTab === 'gtip') {
         setResults(data);
         setSearchResultsIndices([]);
         setCurrentMatchIndex(-1);
         setShowDetail(false);
-        if (!data.length) {
-          showToast('Eşleşme bulunamadı.', 'error');
-        }
+        if (!data.length) showToast('Eşleşme bulunamadı.', 'error');
       } else if (activeTab === 'izahname') {
         const formattedResults = data.map(item => ({
           index: item.index || item.Index || null,
-          paragraph: item.Text || item.paragraph || item.paragraf || 'No paragraph data'
+          paragraph: item.Text || item.paragraph || item.paragraf || 'Paragraf verisi yok'
         }));
-        console.log('Formatted Izahname Results:', formattedResults); // Debug log
         setResults(formattedResults);
         setSearchResultsIndices([]);
         setCurrentMatchIndex(-1);
         setShowDetail(false);
-        if (!formattedResults.length) {
-          showToast('Eşleşme bulunamadı.', 'error');
-        }
+        if (!formattedResults.length) showToast('Eşleşme bulunamadı.', 'error');
       } else if (activeTab === 'tarife' || activeTab === 'esya-fihristi') {
         const matchedIndices = results.map((row, index) => {
           try {
@@ -165,23 +144,19 @@ function App() {
               return esya.includes(turkceLower(query)) || armonize.includes(turkceLower(query)) || notlar.includes(turkceLower(query)) ? index : -1;
             }
           } catch (err) {
-            console.error('Row processing error:', err, row);
+            console.error('Row processing error:', err);
             return -1;
           }
         }).filter(index => index !== -1);
         setSearchResultsIndices(matchedIndices);
         setTotalMatches(matchedIndices.length);
         setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
-        if (matchedIndices.length > 0) {
-          scrollToRowWithAlignment(matchedIndices[0]);
-        }
-        if (!matchedIndices.length) {
-          showToast('Eşleşme bulunamadı.', 'error');
-        }
+        if (matchedIndices.length > 0) scrollToRowWithAlignment(matchedIndices[0]);
+        if (!matchedIndices.length) showToast('Eşleşme bulunamadı.', 'error');
       }
     } catch (error) {
-      console.error('Arama hatası:', error);
-      showToast(`Arama sırasında bir hata oluştu: ${error.message}`, 'error');
+      console.error('Search error:', error);
+      showToast(`Arama başarısız: ${error.message || 'Bağlantı hatası'}`, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -192,16 +167,17 @@ function App() {
       setIsLoading(true);
       const response = await axios.get('/api/izahname/context', {
         params: { index },
+        timeout: 10000, // 10s timeout
       });
       const formattedDetail = response.data.map(item => ({
-        paragraph: item.Text || item.paragraph || item.paragraf || 'No context data',
+        paragraph: item.Text || item.paragraph || item.paragraf || 'Bağlam verisi yok',
         isBold: item.index === index
       }));
-      console.log('Formatted Detail Results:', formattedDetail); // Debug log
       setDetailResults(formattedDetail);
       setShowDetail(true);
     } catch (error) {
-      showToast(`Detay alınırken hata oluştu: ${error.message}`, 'error');
+      console.error('Detail fetch error:', error);
+      showToast(`Detay yüklenemedi: ${error.message || 'Bağlantı hatası'}`, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -209,7 +185,7 @@ function App() {
 
   const nextMatch = () => {
     if (searchResultsIndices.length > 0) {
-      setCurrentMatchIndex((prev) => {
+      setCurrentMatchIndex(prev => {
         const newIndex = (prev + 1) % searchResultsIndices.length;
         scrollToRowWithAlignment(searchResultsIndices[newIndex]);
         return newIndex;
@@ -219,7 +195,7 @@ function App() {
 
   const previousMatch = () => {
     if (searchResultsIndices.length > 0) {
-      setCurrentMatchIndex((prev) => {
+      setCurrentMatchIndex(prev => {
         const newIndex = (prev - 1 + searchResultsIndices.length) % searchResultsIndices.length;
         scrollToRowWithAlignment(searchResultsIndices[newIndex]);
         return newIndex;
@@ -244,7 +220,7 @@ function App() {
     { id: 'esya-fihristi', name: 'Eşya Fihristi', label: 'Aranacak kelime veya rakamı girin:' },
   ];
 
-  const activeTabData = tabs.find((tab) => tab.id === activeTab);
+  const activeTabData = tabs.find(tab => tab.id === activeTab);
 
   const rowRenderer = ({ index, key, style }) => {
     try {
@@ -255,10 +231,7 @@ function App() {
       const isMatch = searchResultsIndices.includes(index);
       const rowClassName = `row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`;
 
-      const enhancedStyle = {
-        ...style,
-        width: '100%'
-      };
+      const enhancedStyle = { ...style, width: '100%' };
 
       if (activeTab === 'gtip') {
         return (
@@ -288,7 +261,7 @@ function App() {
       console.error('Row rendering error:', err);
       return (
         <div key={key} style={style} className="row">
-          <div className="cell">Error displaying row</div>
+          <div className="cell">Satır görüntülenemedi</div>
         </div>
       );
     }
@@ -301,7 +274,7 @@ function App() {
       </div>
 
       <div className="tabs">
-        {tabs.map((tab) => (
+        {tabs.map(tab => (
           <button
             key={tab.id}
             className={`tab ${activeTab === tab.id ? 'active' : ''}`}
@@ -320,8 +293,8 @@ function App() {
             <input
               ref={searchInputRef}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && search()}
+              onChange={e => setQuery(e.target.value)}
+              onKeyPress={e => e.key === 'Enter' && search()}
               placeholder="Arama yapın..."
             />
             <button onClick={search} disabled={isLoading}>
@@ -424,7 +397,7 @@ function App() {
               </div>
             )}
 
-            {(activeTab !== 'izahname' && results.length === 0 && !isLoading) && (
+            {activeTab !== 'izahname' && results.length === 0 && !isLoading && (
               <div className="no-results">
                 Arama sonucu bulunamadı. Lütfen arama kriterlerinizi değiştirin.
               </div>
