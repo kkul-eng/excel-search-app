@@ -263,7 +263,7 @@ function App() {
   return (
     <div className="app">
       <div className="header">
-        <h1>Gümrük Tarife İstatistik Pozisyonu Arama Uygulaması</h1>
+        <h1>Gümrük Tarife Arama Uygulaması</h1>
       </div>
 
       <div className="tabs">
