@@ -384,6 +384,7 @@ function App() {
                   rowHeight={30}
                   rowRenderer={rowRenderer}
                   className="virtual-list"
+                  scrollToAlignment="center" // Satırları ortada göster
                 />
               </div>
             )}
@@ -403,6 +404,7 @@ function App() {
                   rowHeight={30}
                   rowRenderer={rowRenderer}
                   className="virtual-list"
+                  scrollToAlignment="center" // Satırları ortada göster
                 />
               </div>
             )}
