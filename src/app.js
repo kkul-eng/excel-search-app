@@ -243,6 +243,7 @@ function App() {
 
   const activeTabData = tabs.find((tab) => tab.id === activeTab);
 
+  // Create a standardized row renderer that properly aligns content across all tabs
   const rowRenderer = ({ index, key, style }) => {
     try {
       const row = results[index];
@@ -250,27 +251,40 @@ function App() {
 
       const isHighlighted = searchResultsIndices[currentMatchIndex] === index;
       const isMatch = searchResultsIndices.includes(index);
+      const rowClassName = `row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`;
+
+      // Enhanced style to ensure row takes full width
+      const enhancedStyle = {
+        ...style,
+        width: '100%'
+      };
 
       if (activeTab === 'gtip') {
         return (
-          <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : ''}`}>
+          <div key={key} style={enhancedStyle} className={rowClassName}>
             <div className="cell code">{row.Kod || ''}</div>
             <div className="cell description">{row.Tanım || ''}</div>
           </div>
         );
       } else if (activeTab === 'tarife') {
         return (
-          <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`}>
+          <div key={key} style={enhancedStyle} className={rowClassName}>
             <div className="cell code">{row['1. Kolon'] || ''}</div>
             <div className="cell description">{row['2. Kolon'] || ''}</div>
           </div>
         );
       } else if (activeTab === 'esya-fihristi') {
         return (
-          <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`}>
+          <div key={key} style={enhancedStyle} className={rowClassName}>
             <div className="cell item">{row['Eşya'] || ''}</div>
             <div className="cell harmonized">{row['Armonize Sistem'] || ''}</div>
             <div className="cell notes">{row['İzahname Notları'] || ''}</div>
+          </div>
+        );
+      } else if (activeTab === 'izahname') {
+        return (
+          <div key={key} style={enhancedStyle} className={rowClassName}>
+            <div className="cell description">{row.Text || ''}</div>
           </div>
         );
       }
@@ -375,7 +389,7 @@ function App() {
                   width={Math.min(1000, window.innerWidth - 40)}
                   height={listHeight}
                   rowCount={results.length}
-                  rowHeight={30}
+                  rowHeight={40} // Increased row height for better readability
                   rowRenderer={rowRenderer}
                   className="virtual-list"
                   scrollToAlignment="center"
@@ -385,29 +399,41 @@ function App() {
 
             {activeTab === 'izahname' && results.length > 0 && (
               <div className="izahname-results">
-                {results.map((r, i) => (
-                  <div key={i} className="izahname-result">
-                    <p>{r.paragraph || ''}</p>
-                    <button onClick={() => fetchDetail(r.index)} className="detail-button">
-                      Detay...
-                    </button>
+                {results.map((result, index) => (
+                  <div
+                    key={index}
+                    className="izahname-item"
+                    onClick={() => fetchDetail(result.index)}
+                  >
+                    <div className="izahname-text">{result.Text}</div>
+                    <div className="izahname-section">{result.Section}</div>
                   </div>
                 ))}
               </div>
             )}
 
-            {activeTab === 'tarife' && results.length > 0 && (
+            {(activeTab === 'tarife' || activeTab === 'esya-fihristi') && results.length > 0 && (
               <div className="list-container">
                 <div className="treeview-header">
-                  <div className="header-cell code">1. Kolon</div>
-                  <div className="header-cell description">2. Kolon</div>
+                  {activeTab === 'tarife' ? (
+                    <>
+                      <div className="header-cell code">1. Kolon</div>
+                      <div className="header-cell description">2. Kolon</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="header-cell item">Eşya</div>
+                      <div className="header-cell harmonized">Armonize Sistem</div>
+                      <div className="header-cell notes">İzahname Notları</div>
+                    </>
+                  )}
                 </div>
                 <List
                   ref={listRef}
                   width={Math.min(1000, window.innerWidth - 40)}
                   height={listHeight}
                   rowCount={results.length}
-                  rowHeight={30}
+                  rowHeight={activeTab === 'esya-fihristi' ? 60 : 40}
                   rowRenderer={rowRenderer}
                   className="virtual-list"
                   scrollToAlignment="center"
@@ -415,23 +441,9 @@ function App() {
               </div>
             )}
 
-            {activeTab === 'esya-fihristi' && results.length > 0 && (
-              <div className="list-container">
-                <div className="treeview-header">
-                  <div className="header-cell item">Eşya</div>
-                  <div className="header-cell harmonized">Armonize Sistem</div>
-                  <div className="header-cell notes">İzahname Notları</div>
-                </div>
-                <List
-                  ref={listRef}
-                  width={Math.min(1000, window.innerWidth - 40)}
-                  height={listHeight}
-                  rowCount={results.length}
-                  rowHeight={30}
-                  rowRenderer={rowRenderer}
-                  className="virtual-list"
-                  scrollToAlignment="center"
-                />
+            {results.length === 0 && !isLoading && (
+              <div className="no-results">
+                Arama sonucu bulunamadı. Lütfen arama kriterlerinizi değiştirin.
               </div>
             )}
           </div>
@@ -439,7 +451,7 @@ function App() {
       </div>
 
       <div className="footer">
-        <p>© {new Date().getFullYear()} Gümrük Tarife Arama Uygulaması</p>
+        <p>© 2025 Gümrük Tarife İstatistik Pozisyonu Arama Uygulaması</p>
       </div>
     </div>
   );
