@@ -15,7 +15,6 @@ function App() {
   const [totalMatches, setTotalMatches] = useState(0);
   const searchInputRef = useRef(null);
   const listRef = useRef(null);
-  const [listHeight, setListHeight] = useState(400);
 
   const turkceLower = (text) => {
     if (!text) return '';
@@ -67,20 +66,7 @@ function App() {
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    
-    // Liste boyutunu ayarla
-    setListHeight(window.innerHeight * 0.6);
-    
-    const handleResize = () => {
-      setListHeight(window.innerHeight * 0.6);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('resize', handleResize);
-    };
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTab]);
 
   useEffect(() => {
@@ -106,21 +92,6 @@ function App() {
         }, 300);
       }, 2500);
     }, 100);
-  };
-
-  const scrollToRowWithAlignment = (index) => {
-    if (listRef.current) {
-      // Önce merkeze kaydır
-      listRef.current.scrollToRow(index);
-      
-      // Ardından DOM güncellendikten sonra pozisyonu kontrol et ve gerekirse yeniden ayarla
-      setTimeout(() => {
-        const list = listRef.current;
-        if (list) {
-          list.scrollToRow(index);
-        }
-      }, 50);
-    }
   };
 
   const search = async () => {
@@ -174,8 +145,8 @@ function App() {
         setSearchResultsIndices(matchedIndices);
         setTotalMatches(matchedIndices.length);
         setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
-        if (matchedIndices.length > 0) {
-          scrollToRowWithAlignment(matchedIndices[0]);
+        if (matchedIndices.length > 0 && listRef.current) {
+          listRef.current.scrollToRow(matchedIndices[0], { align: 'center' });
         }
         if (!matchedIndices.length) {
           showToast('Eşleşme bulunamadı.', 'error');
@@ -208,7 +179,9 @@ function App() {
     if (searchResultsIndices.length > 0) {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev + 1) % searchResultsIndices.length;
-        scrollToRowWithAlignment(searchResultsIndices[newIndex]);
+        if (listRef.current) {
+          listRef.current.scrollToRow(searchResultsIndices[newIndex], { align: 'center' });
+        }
         return newIndex;
       });
     }
@@ -218,7 +191,9 @@ function App() {
     if (searchResultsIndices.length > 0) {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev - 1 + searchResultsIndices.length) % searchResultsIndices.length;
-        scrollToRowWithAlignment(searchResultsIndices[newIndex]);
+        if (listRef.current) {
+          listRef.current.scrollToRow(searchResultsIndices[newIndex], { align: 'center' });
+        }
         return newIndex;
       });
     }
@@ -243,7 +218,6 @@ function App() {
 
   const activeTabData = tabs.find((tab) => tab.id === activeTab);
 
-  // Create a standardized row renderer that properly aligns content across all tabs
   const rowRenderer = ({ index, key, style }) => {
     try {
       const row = results[index];
@@ -251,40 +225,27 @@ function App() {
 
       const isHighlighted = searchResultsIndices[currentMatchIndex] === index;
       const isMatch = searchResultsIndices.includes(index);
-      const rowClassName = `row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`;
-
-      // Enhanced style to ensure row takes full width
-      const enhancedStyle = {
-        ...style,
-        width: '100%'
-      };
 
       if (activeTab === 'gtip') {
         return (
-          <div key={key} style={enhancedStyle} className={rowClassName}>
+          <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : ''}`}>
             <div className="cell code">{row.Kod || ''}</div>
             <div className="cell description">{row.Tanım || ''}</div>
           </div>
         );
       } else if (activeTab === 'tarife') {
         return (
-          <div key={key} style={enhancedStyle} className={rowClassName}>
+          <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`}>
             <div className="cell code">{row['1. Kolon'] || ''}</div>
             <div className="cell description">{row['2. Kolon'] || ''}</div>
           </div>
         );
       } else if (activeTab === 'esya-fihristi') {
         return (
-          <div key={key} style={enhancedStyle} className={rowClassName}>
+          <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`}>
             <div className="cell item">{row['Eşya'] || ''}</div>
             <div className="cell harmonized">{row['Armonize Sistem'] || ''}</div>
             <div className="cell notes">{row['İzahname Notları'] || ''}</div>
-          </div>
-        );
-      } else if (activeTab === 'izahname') {
-        return (
-          <div key={key} style={enhancedStyle} className={rowClassName}>
-            <div className="cell description">{row.Text || ''}</div>
           </div>
         );
       }
@@ -387,63 +348,62 @@ function App() {
                 <List
                   ref={listRef}
                   width={Math.min(1000, window.innerWidth - 40)}
-                  height={listHeight}
+                  height={400}
                   rowCount={results.length}
-                  rowHeight={40} // Increased row height for better readability
+                  rowHeight={30}
                   rowRenderer={rowRenderer}
                   className="virtual-list"
-                  scrollToAlignment="center"
                 />
               </div>
             )}
 
             {activeTab === 'izahname' && results.length > 0 && (
               <div className="izahname-results">
-                {results.map((result, index) => (
-                  <div
-                    key={index}
-                    className="izahname-item"
-                    onClick={() => fetchDetail(result.index)}
-                  >
-                    <div className="izahname-text">{result.Text}</div>
-                    <div className="izahname-section">{result.Section}</div>
+                {results.map((r, i) => (
+                  <div key={i} className="izahname-result">
+                    <p>{r.paragraph || ''}</p>
+                    <button onClick={() => fetchDetail(r.index)} className="detail-button">
+                      Detay...
+                    </button>
                   </div>
                 ))}
               </div>
             )}
 
-            {(activeTab === 'tarife' || activeTab === 'esya-fihristi') && results.length > 0 && (
+            {activeTab === 'tarife' && results.length > 0 && (
               <div className="list-container">
                 <div className="treeview-header">
-                  {activeTab === 'tarife' ? (
-                    <>
-                      <div className="header-cell code">1. Kolon</div>
-                      <div className="header-cell description">2. Kolon</div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="header-cell item">Eşya</div>
-                      <div className="header-cell harmonized">Armonize Sistem</div>
-                      <div className="header-cell notes">İzahname Notları</div>
-                    </>
-                  )}
+                  <div className="header-cell code">1. Kolon</div>
+                  <div className="header-cell description">2. Kolon</div>
                 </div>
                 <List
                   ref={listRef}
                   width={Math.min(1000, window.innerWidth - 40)}
-                  height={listHeight}
+                  height={400}
                   rowCount={results.length}
-                  rowHeight={activeTab === 'esya-fihristi' ? 60 : 40}
+                  rowHeight={30}
                   rowRenderer={rowRenderer}
                   className="virtual-list"
-                  scrollToAlignment="center"
                 />
               </div>
             )}
 
-            {results.length === 0 && !isLoading && (
-              <div className="no-results">
-                Arama sonucu bulunamadı. Lütfen arama kriterlerinizi değiştirin.
+            {activeTab === 'esya-fihristi' && results.length > 0 && (
+              <div className="list-container">
+                <div className="treeview-header">
+                  <div className="header-cell item">Eşya</div>
+                  <div className="header-cell harmonized">Armonize Sistem</div>
+                  <div className="header-cell notes">İzahname Notları</div>
+                </div>
+                <List
+                  ref={listRef}
+                  width={Math.min(1000, window.innerWidth - 40)}
+                  height={400}
+                  rowCount={results.length}
+                  rowHeight={30}
+                  rowRenderer={rowRenderer}
+                  className="virtual-list"
+                />
               </div>
             )}
           </div>
@@ -451,7 +411,7 @@ function App() {
       </div>
 
       <div className="footer">
-        <p>© 2025 Gümrük Tarife İstatistik Pozisyonu Arama Uygulaması</p>
+        <p>© {new Date().getFullYear()} Gümrük Tarife Arama Uygulaması</p>
       </div>
     </div>
   );
