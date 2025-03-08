@@ -37,19 +37,16 @@ function App() {
         let response;
         if (activeTab === 'tarife') {
           response = await axios.get('/api/tarife/all');
-          console.log('Tarife Cetveli açılış verisi:', response.data);
           setResults(response.data);
           setSearchResultsIndices([]);
           setCurrentMatchIndex(-1);
         } else if (activeTab === 'esya-fihristi') {
           response = await axios.get('/api/esya-fihristi/all');
-          console.log('Eşya Fihristi açılış verisi:', response.data);
           setResults(response.data);
           setSearchResultsIndices([]);
           setCurrentMatchIndex(-1);
         } else {
           setResults([]);
-          console.log(`${activeTab} sekmesi açılışta boş bırakıldı`);
         }
       } catch (error) {
         console.error('Veri yüklenirken hata:', error);
@@ -68,7 +65,6 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     
-    // Liste boyutunu ayarla
     setListHeight(window.innerHeight * 0.6);
     
     const handleResize = () => {
@@ -110,10 +106,7 @@ function App() {
 
   const scrollToRowWithAlignment = (index) => {
     if (listRef.current) {
-      // Önce merkeze kaydır
       listRef.current.scrollToRow(index);
-      
-      // Ardından DOM güncellendikten sonra pozisyonu kontrol et ve gerekirse yeniden ayarla
       setTimeout(() => {
         const list = listRef.current;
         if (list) {
@@ -135,7 +128,6 @@ function App() {
         params: { query },
       });
       const data = response.data;
-      console.log(`${activeTab} arama verisi:`, data);
 
       if (activeTab === 'gtip') {
         setResults(data);
@@ -146,7 +138,10 @@ function App() {
           showToast('Eşleşme bulunamadı.', 'error');
         }
       } else if (activeTab === 'izahname') {
-        setResults(data);
+        setResults(data.map(item => ({
+          index: item.index,
+          paragraph: item.Text
+        })));
         setSearchResultsIndices([]);
         setCurrentMatchIndex(-1);
         setShowDetail(false);
@@ -195,7 +190,10 @@ function App() {
       const response = await axios.get('/api/izahname/context', {
         params: { index },
       });
-      setDetailResults(response.data);
+      setDetailResults(response.data.map(item => ({
+        paragraph: item.Text,
+        isBold: item.index === index
+      })));
       setShowDetail(true);
     } catch (error) {
       showToast(`Detay alınırken hata oluştu: ${error.message}`, 'error');
@@ -243,7 +241,6 @@ function App() {
 
   const activeTabData = tabs.find((tab) => tab.id === activeTab);
 
-  // Create a standardized row renderer that properly aligns content across all tabs
   const rowRenderer = ({ index, key, style }) => {
     try {
       const row = results[index];
@@ -253,7 +250,6 @@ function App() {
       const isMatch = searchResultsIndices.includes(index);
       const rowClassName = `row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`;
 
-      // Enhanced style to ensure row takes full width
       const enhancedStyle = {
         ...style,
         width: '100%'
@@ -279,12 +275,6 @@ function App() {
             <div className="cell item">{row['Eşya'] || ''}</div>
             <div className="cell harmonized">{row['Armonize Sistem'] || ''}</div>
             <div className="cell notes">{row['İzahname Notları'] || ''}</div>
-          </div>
-        );
-      } else if (activeTab === 'izahname') {
-        return (
-          <div key={key} style={enhancedStyle} className={rowClassName}>
-            <div className="cell description">{row.Text || ''}</div>
           </div>
         );
       }
@@ -322,16 +312,6 @@ function App() {
         <div className="search-container">
           <label>{activeTabData.label}</label>
           <div className="search">
-            {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 1 && (
-              <button
-                onClick={previousMatch}
-                className="nav-button"
-                disabled={searchResultsIndices.length <= 1}
-                title="Önceki eşleşme"
-              >
-                ◄
-              </button>
-            )}
             <input
               ref={searchInputRef}
               value={query}
@@ -342,29 +322,14 @@ function App() {
             <button onClick={search} disabled={isLoading}>
               {isLoading ? 'Aranıyor...' : 'Ara'}
             </button>
-            {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 1 && (
-              <button
-                onClick={nextMatch}
-                className="nav-button"
-                disabled={searchResultsIndices.length <= 1}
-                title="Sonraki eşleşme"
-              >
-                ►
-              </button>
-            )}
           </div>
-          {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 0 && (
-            <div className="match-info">
-              {currentMatchIndex >= 0 ? currentMatchIndex + 1 : 0} / {totalMatches} eşleşme
-            </div>
-          )}
         </div>
 
         {isLoading && <div className="loader"></div>}
 
         {!isLoading && showDetail ? (
           <div className="results izahname-detail">
-            <h3>İzahname Detay</h3>
+            <h3>İzahname Sayfası</h3>
             <div className="detail-container">
               {detailResults.map((result, index) => (
                 <p key={index} className={result.isBold ? 'bold' : ''}>
@@ -389,7 +354,7 @@ function App() {
                   width={Math.min(1000, window.innerWidth - 40)}
                   height={listHeight}
                   rowCount={results.length}
-                  rowHeight={40} // Increased row height for better readability
+                  rowHeight={40}
                   rowRenderer={rowRenderer}
                   className="virtual-list"
                   scrollToAlignment="center"
@@ -399,14 +364,15 @@ function App() {
 
             {activeTab === 'izahname' && results.length > 0 && (
               <div className="izahname-results">
+                <h3>İlgili Paragraflar</h3>
                 {results.map((result, index) => (
                   <div
                     key={index}
                     className="izahname-item"
                     onClick={() => fetchDetail(result.index)}
                   >
-                    <div className="izahname-text">{result.Text}</div>
-                    <div className="izahname-section">{result.Section}</div>
+                    <div className="izahname-text">{result.paragraph}</div>
+                    <div className="izahname-detail-link">Detay...</div>
                   </div>
                 ))}
               </div>
