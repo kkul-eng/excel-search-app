@@ -857,11 +857,11 @@ function App() {
                   <div style={styles.warningContainer}>
                     <p>Bu sayfada:</p>
                     <ul style={styles.warningList}>
-                      <li>3824 veya 382410: Birleşik kelimelerle arama yapmaktan kaçının.</li>
-                      <li>Kelimeleri ayrı ayrı arayın.</li>
-                      <li>Örneğin, "Polyester Beams" yerine ayrı ayrı "Polyester" ve "Beams" arayın.</li>
-                      <li>Sonuç çıkmazsa, farklı bir kelime ile arama yapın.</li>
-                      <li>Kamu versiyonu İzahname içinde arama yapmaz.</li>
+                      <li>3824 veya 382410 şeklinde GTİP kodu ile aralarda noktalama işariti olmadan arama,</li>
+                      <li>dokunmuş boyalı poliester pamuk devamsız mensucat şeklinde aramak yerine </li>
+                      <li>yazım sırası önemli olmadan; do bo pa po de me şeklinde arama</li>
+                      <li>Tereftalik asit şeklinde arama,</li>
+                      <li>yapabilirsiniz.</li>
                     </ul>
                   </div>
                 ) : (
