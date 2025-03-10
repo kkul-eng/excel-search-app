@@ -68,7 +68,6 @@ function App() {
         }
       } catch (error) {
         console.error('Veri yükleme hatası:', error);
-        showToast('Veri yüklenirken bir hata oluştu.', 'error');
       } finally {
         setIsLoading(false);
       }
@@ -146,51 +145,9 @@ function App() {
     };
   }, []);
 
-  // Toast mesajı göster
-  const showToast = useCallback((message, type = 'info') => {
-    const toast = document.createElement('div');
-    toast.style.position = 'fixed';
-    toast.style.bottom = '20px';
-    toast.style.left = '50%';
-    toast.style.transform = 'translateX(-50%) translateY(100px)';
-    toast.style.padding = '10px 20px';
-    toast.style.borderRadius = '4px';
-    toast.style.fontSize = '14px';
-    toast.style.zIndex = '1000';
-    toast.style.opacity = '0';
-    toast.style.transition = 'transform 0.3s, opacity 0.3s';
-    
-    if (type === 'info') {
-      toast.style.backgroundColor = '#1e293b';
-      toast.style.color = 'white';
-    } else if (type === 'success') {
-      toast.style.backgroundColor = '#10b981';
-      toast.style.color = 'white';
-    } else if (type === 'error') {
-      toast.style.backgroundColor = '#ef4444';
-      toast.style.color = 'white';
-    }
-    
-    toast.innerText = message;
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-      toast.style.transform = 'translateX(-50%) translateY(0)';
-      toast.style.opacity = '1';
-      setTimeout(() => {
-        toast.style.transform = 'translateX(-50%) translateY(100px)';
-        toast.style.opacity = '0';
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 300);
-      }, 2500);
-    }, 100);
-  }, []);
-
   // Arama fonksiyonu
   const search = useCallback(async () => {
     if (!query.trim()) {
-      showToast('Lütfen geçerli bir kelime veya ifade girin.', 'error');
       return;
     }
 
@@ -205,12 +162,6 @@ function App() {
         setSearchResultsIndices([]);
         setCurrentMatchIndex(-1);
         setShowDetail(false);
-        
-        if (!data.length) {
-          showToast('Eşleşme bulunamadı.', 'error');
-        } else {
-          showToast(`${data.length} sonuç bulundu.`, 'success');
-        }
       } else if (activeTab === 'tarife' || activeTab === 'esya-fihristi') {
         // Önce tüm veriyi yüklediğimizden emin olalım
         if (results.length === 0) {
@@ -256,20 +207,13 @@ function App() {
         if (matchedIndices.length > 0 && listRef.current) {
           listRef.current.scrollToIndex(matchedIndices[0]);
         }
-        
-        if (!matchedIndices.length) {
-          showToast('Eşleşme bulunamadı.', 'error');
-        } else {
-          showToast(`${matchedIndices.length} sonuç bulundu.`, 'success');
-        }
       }
     } catch (error) {
       console.error('Arama hatası:', error);
-      showToast(`Arama sırasında bir hata oluştu.`, 'error');
     } finally {
       setIsLoading(false);
     }
-  }, [activeTab, query, results, turkceLower, showToast]);
+  }, [activeTab, query, results, turkceLower]);
 
   // İzahname detay verisi çekme
   const fetchDetail = useCallback(async (index) => {
@@ -281,11 +225,10 @@ function App() {
       setShowDetail(true);
     } catch (error) {
       console.error('Detay alma hatası:', error);
-      showToast(`Detay alınırken hata oluştu.`, 'error');
     } finally {
       setIsLoading(false);
     }
-  }, [showToast]);
+  }, []);
 
   // Sonraki eşleşmeye git
   const nextMatch = useCallback(() => {
@@ -535,6 +478,7 @@ function App() {
       border: '2px solid #e2e8f0',
       borderRadius: '8px',
       transition: 'all 0.3s ease',
+      autocomplete: 'off', // Disable browser autocomplete
     },
     searchButton: {
       padding: '10px 25px',
@@ -763,6 +707,7 @@ function App() {
               placeholder={`${activeTabData.name} için arama yapın...`}
               aria-label="Arama"
               style={styles.searchInput}
+              autoComplete="off" 
             />
             <button 
               onClick={search} 
@@ -853,7 +798,7 @@ function App() {
             )}
 
             {activeTab === 'tarife' && results.length > 0 && (
-              <div style={styles.listContainer}>
+              <div style={{ ...styles.listContainer, margin: '0 auto' }}>
                 <div style={styles.treeviewHeader}>
                   <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>1. Kolon</div>
                   <div style={{ ...styles.headerCell, ...styles.headerCellDescription }}>2. Kolon</div>
@@ -869,7 +814,7 @@ function App() {
             )}
 
             {activeTab === 'esya-fihristi' && results.length > 0 && (
-              <div style={styles.listContainer}>
+              <div style={{ ...styles.listContainer, margin: '0 auto' }}>
                 <div style={styles.treeviewHeader}>
                   <div style={{ ...styles.headerCell, ...styles.headerCellItem }}>Eşya</div>
                   <div style={{ ...styles.headerCell, ...styles.headerCellHarmonized }}>Armonize Sistem</div>
