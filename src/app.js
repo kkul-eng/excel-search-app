@@ -652,7 +652,7 @@ function App() {
     },
     emptyState: {
       padding: '30px',
-      textAlign: 'center',
+      textAlign: 'left', // Yazıları sola yaslamak için güncellendi
       color: '#64748b',
     },
     boldText: {
@@ -752,9 +752,9 @@ function App() {
           <div style={{ ...styles.emptyState, paddingBottom: 0 }}>
             <p>- 3824 veya 382410 şeklinde GTİP kodu ile aralarda noktalama işareti olmadan arama,</p>
             <p>- dokunmuş boyalı poliester pamuk devamsız mensucat şeklinde aramak yerine,</p>
-            <p>&nbsp;&nbsp;&nbsp;yazım sırası önemli olmadan; do bo pa po de me şeklinde arama,</p>
-            <p>&nbsp;&nbsp;&nbsp;Tereftalik asit şeklinde arama,</p>
-            <p>yapabilirsiniz.</p>
+            <p>  yazım sırası önemli olmadan; do bo pa po de me şeklinde arama,</p>
+            <p>  Tereftalik asit şeklinde arama,</p>
+            <p>  yapabilirsiniz.</p>
           </div>
         )}
 
