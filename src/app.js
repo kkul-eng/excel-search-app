@@ -793,9 +793,6 @@ function App() {
               ))}
             </div>
             <button 
-              onClick={() => setShowDetail(false)}
-              style={styles.backButton}
-              aria-label="
 onClick={() => setShowDetail(false)}
               style={styles.backButton}
               aria-label="Geri dön"
@@ -807,7 +804,7 @@ onClick={() => setShowDetail(false)}
           <div style={styles.results}>
             {activeTab === 'gtip' && results.length > 0 && (
               <div style={styles.listContainer}>
-                <div style={styles.treeviewHeader}>
+                <div style={styles.treevieonClick={() => setShowDetail(false)}wHeader}>
                   <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>Kod</div>
                   <div style={{ ...styles.headerCell, ...styles.headerCellDescription }}>Tanım</div>
                 </div>
