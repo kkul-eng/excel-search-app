@@ -707,4 +707,177 @@ return (
                 }}
                 disabled={searchResultsIndices.length <= 1}
                 title="Önceki eşleşme"
-                aria-label="Ö
+   aria-label="Önceki eşleşme"
+              >
+                ◄
+              </button>
+            )}
+            <input
+              id="search-input"
+              ref={searchInputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder={`${activeTabData.name} ...`}
+              aria-label="Arama"
+              style={styles.searchInput}
+              autoComplete="off" 
+            />
+            <button 
+              onClick={search} 
+              disabled={isLoading}
+              aria-label="Ara"
+              style={{
+                ...styles.searchButton,
+                ...(isLoading ? styles.searchButtonDisabled : {})
+              }}
+            >
+              {isLoading ? 'Aranıyor...' : 'Ara'}
+            </button>
+            {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 1 && (
+              <button
+                onClick={nextMatch}
+                style={{
+                  ...styles.navButton,
+                  ...(searchResultsIndices.length <= 1 ? styles.navButtonDisabled : {})
+                }}
+                disabled={searchResultsIndices.length <= 1}
+                title="Sonraki eşleşme"
+                aria-label="Sonraki eşleşme"
+              >
+                ►
+              </button>
+            )}
+          </div>
+          {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 0 && (
+            <div style={styles.matchInfo}>
+              {currentMatchIndex >= 0 ? currentMatchIndex + 1 : 0} / {totalMatches} eşleşme
+            </div>
+          )}
+        </div>
+
+        {activeTab === 'gtip' && results.length === 0 && !isLoading && (
+          <div style={{ ...styles.emptyState, paddingBottom: 0 }}>
+            <p>  Bu sayfada;</p>
+            <p>- 3824 veya 382410 şeklinde GTİP kodu ile aralarda noktalama işareti olmadan arama,</p>
+            <p>- dokunmuş boyalı poliester pamuk devamsız mensucat şeklinde aramak yerine,</p>
+            <p>  yazım sırası önemli olmadan; do bo pa po de me şeklinde arama,</p>
+            <p>- sülfirik veya sülfirik asit şeklinde arama,</p>
+            <p>  yapabilirsiniz.</p>
+          </div>
+        )}
+
+        {activeTab === 'izahname' && results.length === 0 && !isLoading && !showDetail && (
+          <div style={{ ...styles.emptyState, paddingBottom: 0 }}>
+            <p>  Bu sayfada;</p>
+            <p>- izahnamede aramak istediğiniz kelime veya kelimelerle arama,</p>
+            <p>- herhangi bir fasıl için arama yapmak istediğinizde 59.03 gibi arama,</p>
+            <p>  yapabilirsiniz.</p>
+          </div>
+        )}
+
+        {isLoading && <div style={styles.loader} aria-label="Yükleniyor"></div>}
+
+        {!isLoading && showDetail ? (
+          <div style={styles.results}>
+            <h3 style={{ fontSize: '18px', color: '#1e293b', marginBottom: '15px', fontWeight: '500' }}>İzahname Detay</h3>
+            <div style={styles.izahnameDetailContainer} className="custom-scrollbar">
+              {detailResults.map((result, index) => (
+                <p key={index} style={result.isBold ? styles.boldText : {}}>
+                  {result.paragraph || ''}
+                </p>
+              ))}
+            </div>
+            <button 
+              onClick={() => setShowDetail(false)}
+              style={styles.backButton}
+              aria-label="Geri dön"
+            >
+              <span>←</span> Geri Dön
+            </button>
+          </div>
+        ) : (
+          <div style={styles.results}>
+            {activeTab === 'gtip' && results.length > 0 && (
+              <div style={styles.listContainer}>
+                <div style={styles.treeviewHeader}>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>Kod</div>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellDescription }}>Tanım</div>
+                </div>
+                <VirtualList
+                  items={results}
+                  height={350}
+                  rowHeight={40}
+                  rowRenderer={rowRenderer}
+                  ref={listRef}
+                />
+              </div>
+            )}
+
+            {activeTab === 'izahname' && results.length > 0 && (
+              <div style={styles.izahnameResults}>
+                {results.map((r, i) => (
+                  <div key={i} style={styles.izahnameResult}>
+                    <p>{r.paragraph || ''}</p>
+                    <button 
+                      onClick={() => fetchDetail(r.index)} 
+                      style={styles.detailButton}
+                      aria-label="İzahname detayını görüntüle"
+                    >
+                      Detay...
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeTab === 'tarife' && results.length > 0 && (
+              <div style={{ ...styles.listContainer, margin: '0 auto' }}>
+                <div style={styles.treeviewHeader}>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>1. Kolon</div>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellDescription }}>2. Kolon</div>
+                </div>
+                <VirtualList
+                  items={results}
+                  height={350}
+                  rowHeight={40}
+                  rowRenderer={rowRenderer}
+                  ref={listRef}
+                />
+              </div>
+            )}
+
+            {activeTab === 'esya-fihristi' && results.length > 0 && (
+              <div style={{ ...styles.listContainer, margin: '0 auto' }}>
+                <div style={styles.treeviewHeader}>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellItem }}>Eşya</div>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellHarmonized }}>Armonize Sistem</div>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellNotes }}>İzahname Notları</div>
+                </div>
+                <VirtualList
+                  items={results}
+                  height={350}
+                  rowHeight={40}
+                  rowRenderer={rowRenderer}
+                  ref={listRef}
+                />
+              </div>
+            )}
+            
+            {results.length === 0 && !isLoading && activeTab !== 'gtip' && activeTab !== 'izahname' && (
+              <div style={styles.emptyState}>
+                <p>Arama yapmak için yukarıdaki form alanını kullanın</p>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      <footer style={styles.footer}>
+        <p>© {new Date().getFullYear()} Gümrük Tarife Arama Uygulaması</p>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
