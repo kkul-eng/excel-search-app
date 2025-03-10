@@ -205,7 +205,10 @@ function App() {
         setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
         
         if (matchedIndices.length > 0 && listRef.current) {
-          listRef.current.scrollToIndex(matchedIndices[0]);
+          listRef.current.scrollToIndex({
+            index: matchedIndices[0],
+            align: 'center', // Satırı ortalar
+          });
         }
       }
     } catch (error) {
@@ -236,7 +239,10 @@ function App() {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev + 1) % searchResultsIndices.length;
         if (listRef.current) {
-          listRef.current.scrollToIndex(searchResultsIndices[newIndex]);
+          listRef.current.scrollToIndex({
+            index: searchResultsIndices[newIndex],
+            align: 'center', // Satırı ortalar
+          });
         }
         return newIndex;
       });
@@ -249,7 +255,10 @@ function App() {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev - 1 + searchResultsIndices.length) % searchResultsIndices.length;
         if (listRef.current) {
-          listRef.current.scrollToIndex(searchResultsIndices[newIndex]);
+          listRef.current.scrollToIndex({
+            index: searchResultsIndices[newIndex],
+            align: 'center', // Satırı ortalar
+          });
         }
         return newIndex;
       });
