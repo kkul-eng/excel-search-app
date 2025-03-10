@@ -655,21 +655,6 @@ function App() {
       textAlign: 'center',
       color: '#64748b',
     },
-    warningContainer: {
-      padding: '20px',
-      backgroundColor: '#fef2f2', // Light red background for warning
-      border: '1px solid #fecaca',
-      borderRadius: '8px',
-      color: '#b91c1c', // Dark red text
-      fontSize: '14px',
-      lineHeight: '1.6',
-      maxWidth: '600px',
-      margin: '0 auto',
-    },
-    warningList: {
-      paddingLeft: '20px',
-      margin: '10px 0 0 0',
-    },
     boldText: {
       fontWeight: '700',
       backgroundColor: '#f0f9ff',
@@ -763,6 +748,16 @@ function App() {
           )}
         </div>
 
+        {activeTab === 'gtip' && results.length === 0 && !isLoading && (
+          <div style={{ ...styles.emptyState, paddingBottom: 0 }}>
+            <p>- 3824 veya 382410 şeklinde GTİP kodu ile aralarda noktalama işareti olmadan arama,</p>
+            <p>- dokunmuş boyalı poliester pamuk devamsız mensucat şeklinde aramak yerine,</p>
+            <p>&nbsp;&nbsp;&nbsp;yazım sırası önemli olmadan; do bo pa po de me şeklinde arama,</p>
+            <p>&nbsp;&nbsp;&nbsp;Tereftalik asit şeklinde arama,</p>
+            <p>yapabilirsiniz.</p>
+          </div>
+        )}
+
         {isLoading && <div style={styles.loader} aria-label="Yükleniyor"></div>}
 
         {!isLoading && showDetail ? (
@@ -851,22 +846,9 @@ function App() {
               </div>
             )}
             
-            {results.length === 0 && !isLoading && (
+            {results.length === 0 && !isLoading && activeTab !== 'gtip' && (
               <div style={styles.emptyState}>
-                {activeTab === 'gtip' ? (
-                  <div style={styles.warningContainer}>
-                    <p>Bu sayfada:</p>
-                    <ul style={styles.warningList}>
-                      <li>3824 veya 382410 şeklinde GTİP kodu ile aralarda noktalama işariti olmadan arama,</li>
-                      <li>dokunmuş boyalı poliester pamuk devamsız mensucat şeklinde aramak yerine </li>
-                      <li>yazım sırası önemli olmadan; do bo pa po de me şeklinde arama</li>
-                      <li>Tereftalik asit şeklinde arama,</li>
-                      <li>yapabilirsiniz.</li>
-                    </ul>
-                  </div>
-                ) : (
-                  <p>Arama yapmak için yukarıdaki form alanını kullanın</p>
-                )}
+                <p>Arama yapmak için yukarıdaki form alanını kullanın</p>
               </div>
             )}
           </div>
