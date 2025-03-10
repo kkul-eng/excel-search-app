@@ -655,6 +655,21 @@ function App() {
       textAlign: 'center',
       color: '#64748b',
     },
+    warningContainer: {
+      padding: '20px',
+      backgroundColor: '#fef2f2', // Light red background for warning
+      border: '1px solid #fecaca',
+      borderRadius: '8px',
+      color: '#b91c1c', // Dark red text
+      fontSize: '14px',
+      lineHeight: '1.6',
+      maxWidth: '600px',
+      margin: '0 auto',
+    },
+    warningList: {
+      paddingLeft: '20px',
+      margin: '10px 0 0 0',
+    },
     boldText: {
       fontWeight: '700',
       backgroundColor: '#f0f9ff',
@@ -838,7 +853,20 @@ function App() {
             
             {results.length === 0 && !isLoading && (
               <div style={styles.emptyState}>
-                <p>Arama yapmak için yukarıdaki form alanını kullanın</p>
+                {activeTab === 'gtip' ? (
+                  <div style={styles.warningContainer}>
+                    <p>Bu sayfada:</p>
+                    <ul style={styles.warningList}>
+                      <li>3824 veya 382410: Birleşik kelimelerle arama yapmaktan kaçının.</li>
+                      <li>Kelimeleri ayrı ayrı arayın.</li>
+                      <li>Örneğin, "Polyester Beams" yerine ayrı ayrı "Polyester" ve "Beams" arayın.</li>
+                      <li>Sonuç çıkmazsa, farklı bir kelime ile arama yapın.</li>
+                      <li>Kamu versiyonu İzahname içinde arama yapmaz.</li>
+                    </ul>
+                  </div>
+                ) : (
+                  <p>Arama yapmak için yukarıdaki form alanını kullanın</p>
+                )}
               </div>
             )}
           </div>
