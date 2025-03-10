@@ -802,21 +802,21 @@ function App() {
           </div>
         ) : (
           <div style={styles.results}>
-            {activeTab === 'gtip' && results.length > 0 && (
-              <div style={styles.listContainer}>
-                <div style={styles.treevieonClick={() => setShowDetail(false)}wHeader}>
-                  <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>Kod</div>
-                  <div style={{ ...styles.headerCell, ...styles.headerCellDescription }}>Tanım</div>
-                </div>
-                <VirtualList
-                  items={results}
-                  height={350}
-                  rowHeight={40}
-                  rowRenderer={rowRenderer}
-                  ref={listRef}
-                />
-              </div>
-            )}
+{activeTab === 'gtip' && results.length > 0 && (
+  <div style={styles.listContainer}>
+    <div style={styles.treeviewHeader}>
+      <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>Kod</div>
+      <div style={{ ...styles.headerCell, ...styles.headerCellDescription }}>Tanım</div>
+    </div>
+    <VirtualList
+      items={results}
+      height={350}
+      rowHeight={40}
+      rowRenderer={rowRenderer}
+      ref={listRef}
+    />
+  </div>
+)}
 
             {activeTab === 'izahname' && results.length > 0 && (
               <div style={styles.izahnameResults}>
