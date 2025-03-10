@@ -33,11 +33,47 @@ const VirtualList = forwardRef(({ items, height, rowHeight, rowRenderer }, ref) 
     setVisibleItems(visibleRows);
   }, [items, scrollTop, height, rowHeight]);
 
-  // Scroll to a specific index
-  const scrollToIndex = (index) => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = index * rowHeight;
+  // Enhanced scrollToIndex to support alignment options
+  const scrollToIndex = (options) => {
+    if (!containerRef.current) return;
+    
+    let index;
+    let align = 'top';
+    
+    // Support both direct index or options object with index and align
+    if (typeof options === 'object') {
+      index = options.index;
+      align = options.align || 'top';
+    } else {
+      index = options;
     }
+    
+    if (index < 0 || index >= (items?.length || 0)) return;
+    
+    // Calculate scroll position based on alignment
+    let scrollPosition;
+    switch (align) {
+      case 'center':
+        // Center the row in the viewport
+        scrollPosition = Math.max(
+          0,
+          index * rowHeight - (height - rowHeight) / 2
+        );
+        break;
+      case 'end':
+      case 'bottom':
+        // Align to bottom
+        scrollPosition = (index + 1) * rowHeight - height;
+        break;
+      case 'start':
+      case 'top':
+      default:
+        // Align to top (default behavior)
+        scrollPosition = index * rowHeight;
+        break;
+    }
+    
+    containerRef.current.scrollTop = scrollPosition;
   };
 
   const handleScroll = (e) => {
@@ -47,7 +83,7 @@ const VirtualList = forwardRef(({ items, height, rowHeight, rowRenderer }, ref) 
   // Expose scrollToIndex to parent via ref
   useImperativeHandle(ref, () => ({
     scrollToIndex,
-  }), [rowHeight]);
+  }), [items, height, rowHeight]);
 
   return (
     <div
@@ -62,7 +98,7 @@ const VirtualList = forwardRef(({ items, height, rowHeight, rowRenderer }, ref) 
       onScroll={handleScroll}
       className="custom-scrollbar"
     >
-      <div style={{ height: items.length * rowHeight, position: 'relative' }}>
+      <div style={{ height: items ? items.length * rowHeight : 0, position: 'relative' }}>
         {visibleItems.map(({ index, style }) => rowRenderer({ index, key: `row-${index}`, style }))}
       </div>
     </div>
