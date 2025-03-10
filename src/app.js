@@ -42,29 +42,32 @@ function App() {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        setIsLoading(true);
-        let response;
-        let data;
-        
-        if (activeTab === 'tarife') {
-          response = await fetch('/api/tarife/all');
-          data = await response.json();
-          setResults(data || []);
-          setSearchResultsIndices([]);
-          setCurrentMatchIndex(-1);
-          setTotalMatches(0);
-        } else if (activeTab === 'esya-fihristi') {
-          response = await fetch('/api/esya-fihristi/all');
-          data = await response.json();
-          setResults(data || []);
-          setSearchResultsIndices([]);
-          setCurrentMatchIndex(-1);
-          setTotalMatches(0);
-        } else {
-          setResults([]);
-          setSearchResultsIndices([]);
-          setCurrentMatchIndex(-1);
-          setTotalMatches(0);
+        // GTİP sekmesinde başlangıçta veri yüklemeye gerek yok, sadece kullanıcı arama yaptığında sonuçlar gösterilecek
+        if (activeTab !== 'gtip') {
+          setIsLoading(true);
+          let response;
+          let data;
+          
+          if (activeTab === 'tarife') {
+            response = await fetch('/api/tarife/all');
+            data = await response.json();
+            setResults(data || []);
+            setSearchResultsIndices([]);
+            setCurrentMatchIndex(-1);
+            setTotalMatches(0);
+          } else if (activeTab === 'esya-fihristi') {
+            response = await fetch('/api/esya-fihristi/all');
+            data = await response.json();
+            setResults(data || []);
+            setSearchResultsIndices([]);
+            setCurrentMatchIndex(-1);
+            setTotalMatches(0);
+          } else {
+            setResults([]);
+            setSearchResultsIndices([]);
+            setCurrentMatchIndex(-1);
+            setTotalMatches(0);
+          }
         }
       } catch (error) {
         console.error('Veri yükleme hatası:', error);
@@ -265,13 +268,22 @@ function App() {
   // Sekme değiştiğinde durumu sıfırla
   const resetState = useCallback((tabId) => {
     setActiveTab(tabId);
-    setResults([]);
-    setSearchResultsIndices([]);
-    setQuery('');
-    setShowDetail(false);
-    setCurrentMatchIndex(-1);
-    setTotalMatches(0);
-  }, []);
+    
+    // GTİP arama sekmesine geçerken sonuçları koruyalım, 
+    // diğer sekmelerde her zamanki gibi temizleyelim
+    if (tabId !== 'gtip') {
+      setResults([]);
+      setSearchResultsIndices([]);
+      setQuery('');
+      setShowDetail(false);
+      setCurrentMatchIndex(-1);
+      setTotalMatches(0);
+    } else if (activeTab !== 'gtip') {
+      // Başka bir sekmeden GTİP'e geçiliyorsa, önceki arama sorgusunu koruyalım
+      // ama temiz bir sonuç listesi gösterelim, kullanıcı tekrar arama yapabilir
+      setResults([]);
+    }
+  }, [activeTab]);
 
   // Enter tuşunda arama yap
   const handleKeyPress = useCallback((e) => {
@@ -782,6 +794,9 @@ function App() {
             </div>
             <button 
               onClick={() => setShowDetail(false)}
+              style={styles.backButton}
+              aria-label="
+onClick={() => setShowDetail(false)}
               style={styles.backButton}
               aria-label="Geri dön"
             >
