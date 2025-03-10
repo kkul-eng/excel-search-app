@@ -32,7 +32,7 @@ function App() {
   const tabs = useMemo(() => [
     { id: 'gtip', name: 'GTİP Arama', label: 'Aradığınız GTİP kodu veya kelimeleri girin:' },
     { id: 'izahname', name: 'İzahname Arama', label: 'Aranacak kelime veya kelimeleri girin:' },
-    { id: 'tarife', name: 'Tarife Cetveli', label: 'Aranacak kelime veya rakamı girin:' },
+    { id: 'tarife', name: 'Tarife Cetveli', label: 'Aranacak kelime veya rakamı(izahnamedeki gibi) girin:' },
     { id: 'esya-fihristi', name: 'Eşya Fihristi', label: 'Aranacak kelime veya rakamı girin:' },
   ], []);
 
@@ -750,6 +750,7 @@ function App() {
 
         {activeTab === 'gtip' && results.length === 0 && !isLoading && (
           <div style={{ ...styles.emptyState, paddingBottom: 0 }}>
+            <p>  Bu sayfada;</p>
             <p>- 3824 veya 382410 şeklinde GTİP kodu ile aralarda noktalama işareti olmadan arama,</p>
             <p>- dokunmuş boyalı poliester pamuk devamsız mensucat şeklinde aramak yerine,</p>
             <p>   yazım sırası önemli olmadan; do bo pa po de me şeklinde arama,</p>
@@ -762,7 +763,7 @@ function App() {
           <div style={{ ...styles.emptyState, paddingBottom: 0 }}>
             <p> Bu sayfada;</p>
             <p> - izahnamede aramak istediğiniz kelime veya kelimelerle arama,</p>
-            <p> - Herhangi bir fasıl için arama yapmak istediğinizde 59.03 gibi arama</p>
+            <p> - Herhangi bir fasıl için arama yapmak istediğinizde 59.03 gibi arama,</p>
             <p>  yapabilirsiniz</p>
           </div>
         )}
