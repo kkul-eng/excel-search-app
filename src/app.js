@@ -792,13 +792,13 @@ function App() {
                 </p>
               ))}
             </div>
-            <button 
-onClick={() => setShowDetail(false)}
-              style={styles.backButton}
-              aria-label="Geri dön"
-            >
-              <span>←</span> Geri Dön
-            </button>
+<button 
+  onClick={() => setShowDetail(false)}
+  style={styles.backButton}
+  aria-label="Geri dön"
+>
+  <span>←</span> Geri Dön
+</button>
           </div>
         ) : (
           <div style={styles.results}>
