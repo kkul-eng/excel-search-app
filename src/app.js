@@ -1,7 +1,62 @@
-import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
-import { List } from 'react-virtualized';
-import './App.css';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+
+// Basit sanal liste bileşeni
+const VirtualList = ({ items, height, rowHeight, rowRenderer }) => {
+  const containerRef = useRef(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [visibleItems, setVisibleItems] = useState([]);
+
+  // Kaydırma işlemi sonucunda görünür öğeleri hesapla
+  useEffect(() => {
+    if (!items || !containerRef.current) return;
+    
+    const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight));
+    const endIndex = Math.min(
+      items.length - 1,
+      Math.floor((scrollTop + height) / rowHeight)
+    );
+    
+    const visibleRows = [];
+    for (let i = startIndex; i <= endIndex; i++) {
+      visibleRows.push({
+        index: i,
+        item: items[i],
+        style: {
+          position: 'absolute',
+          top: i * rowHeight,
+          height: rowHeight,
+          left: 0,
+          right: 0
+        }
+      });
+    }
+    
+    setVisibleItems(visibleRows);
+  }, [items, scrollTop, height, rowHeight]);
+
+  // Belirli bir öğeye kaydırma işlevi
+  const scrollToIndex = useCallback((index) => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = index * rowHeight;
+    }
+  }, [rowHeight]);
+
+  const handleScroll = (e) => {
+    setScrollTop(e.target.scrollTop);
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      style={{ height, overflow: 'auto', position: 'relative' }}
+      onScroll={handleScroll}
+    >
+      <div style={{ height: items.length * rowHeight, position: 'relative' }}>
+        {visibleItems.map(({ index, style }) => rowRenderer({ index, key: `row-${index}`, style }))}
+      </div>
+    </div>
+  );
+};
 
 function App() {
   const [activeTab, setActiveTab] = useState('gtip');
@@ -14,61 +69,77 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [totalMatches, setTotalMatches] = useState(0);
   const searchInputRef = useRef(null);
-  const listRef = useRef(null);
+  const listRef = useRef({ scrollToIndex: () => {} });
 
-  const turkceLower = (text) => {
+  // Türkçe karakter dönüşümü
+  const turkceLower = useCallback((text) => {
     if (!text) return '';
     const turkceKarakterler = {
       'İ': 'i', 'I': 'ı', 'Ş': 'ş', 'Ğ': 'ğ',
       'Ü': 'ü', 'Ö': 'ö', 'Ç': 'ç'
     };
-    let result = text;
+    let result = String(text);
     for (const [upper, lower] of Object.entries(turkceKarakterler)) {
       result = result.replace(new RegExp(upper, 'g'), lower);
     }
     return result.toLowerCase();
-  };
+  }, []);
 
+  // Tab verileri
+  const tabs = useMemo(() => [
+    { id: 'gtip', name: 'GTİP Arama', label: 'Aradığınız GTİP kodu veya kelimeleri girin:' },
+    { id: 'izahname', name: 'İzahname Arama', label: 'Aranacak kelime veya kelimeleri girin:' },
+    { id: 'tarife', name: 'Tarife Cetveli', label: 'Aranacak kelime veya rakamı girin:' },
+    { id: 'esya-fihristi', name: 'Eşya Fihristi', label: 'Aranacak kelime veya rakamı girin:' },
+  ], []);
+
+  const activeTabData = useMemo(() => tabs.find((tab) => tab.id === activeTab), [tabs, activeTab]);
+
+  // İlk veriler yüklendiğinde
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         setIsLoading(true);
         let response;
+        let data;
+        
         if (activeTab === 'tarife') {
-          response = await axios.get('/api/tarife/all');
-          console.log('Tarife Cetveli açılış verisi:', response.data);
-          setResults(response.data);
+          response = await fetch('/api/tarife/all');
+          data = await response.json();
+          setResults(data);
           setSearchResultsIndices([]);
           setCurrentMatchIndex(-1);
         } else if (activeTab === 'esya-fihristi') {
-          response = await axios.get('/api/esya-fihristi/all');
-          console.log('Eşya Fihristi açılış verisi:', response.data);
-          setResults(response.data);
+          response = await fetch('/api/esya-fihristi/all');
+          data = await response.json();
+          setResults(data);
           setSearchResultsIndices([]);
           setCurrentMatchIndex(-1);
         } else {
           setResults([]);
-          console.log(`${activeTab} sekmesi açılışta boş bırakıldı`);
         }
       } catch (error) {
-        console.error('Veri yüklenirken hata:', error);
-        showToast('Veri yüklenirken bir hata oluştu: ' + error.message, 'error');
+        showToast('Veri yüklenirken bir hata oluştu.', 'error');
       } finally {
         setIsLoading(false);
       }
     };
+    
     loadInitialData();
 
+    // Kısayol tuşu dinleyicisi
     const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.key === 'f' && activeTab !== 'gtip') {
+      if (e.ctrlKey && e.key === 'f') {
         e.preventDefault();
-        searchInputRef.current.focus();
+        searchInputRef.current?.focus();
       }
     };
+    
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTab]);
 
+  // Yükleme durumunda body sınıfı
   useEffect(() => {
     if (isLoading) {
       document.body.classList.add('is-loading');
@@ -77,24 +148,83 @@ function App() {
     }
   }, [isLoading]);
 
-  const showToast = (message, type = 'info') => {
+  // Keyframe animasyonu için style elementi
+  useEffect(() => {
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+      @keyframes spin {
+        to {
+          transform: translate(-50%, -50%) rotate(360deg);
+        }
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        background-color: #f8fafc;
+        color: #1e293b;
+        line-height: 1.6;
+        margin: 0;
+        padding: 0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      
+      body.is-loading {
+        overflow: hidden;
+      }
+    `;
+    document.head.appendChild(styleElement);
+    
+    return () => {
+      document.head.removeChild(styleElement);
+    };
+  }, []);
+
+  // Toast mesajı göster
+  const showToast = useCallback((message, type = 'info') => {
     const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
+    toast.style.position = 'fixed';
+    toast.style.bottom = '20px';
+    toast.style.left = '50%';
+    toast.style.transform = 'translateX(-50%) translateY(100px)';
+    toast.style.padding = '10px 20px';
+    toast.style.borderRadius = '4px';
+    toast.style.fontSize = '14px';
+    toast.style.zIndex = '1000';
+    toast.style.opacity = '0';
+    toast.style.transition = 'transform 0.3s, opacity 0.3s';
+    
+    if (type === 'info') {
+      toast.style.backgroundColor = '#1e293b';
+      toast.style.color = 'white';
+    } else if (type === 'success') {
+      toast.style.backgroundColor = '#10b981';
+      toast.style.color = 'white';
+    } else if (type === 'error') {
+      toast.style.backgroundColor = '#ef4444';
+      toast.style.color = 'white';
+    }
+    
     toast.innerText = message;
     document.body.appendChild(toast);
 
     setTimeout(() => {
-      toast.className = `toast ${type} show`;
+      toast.style.transform = 'translateX(-50%) translateY(0)';
+      toast.style.opacity = '1';
       setTimeout(() => {
-        toast.className = `toast ${type}`;
+        toast.style.transform = 'translateX(-50%) translateY(100px)';
+        toast.style.opacity = '0';
         setTimeout(() => {
           document.body.removeChild(toast);
         }, 300);
       }, 2500);
     }, 100);
-  };
+  }, []);
 
-  const search = async () => {
+  // Arama fonksiyonu
+  const search = useCallback(async () => {
     if (!query.trim()) {
       showToast('Lütfen geçerli bir kelime veya ifade girin.', 'error');
       return;
@@ -102,104 +232,102 @@ function App() {
 
     try {
       setIsLoading(true);
-      const response = await axios.get(`/api/${activeTab}/search`, {
-        params: { query },
-      });
-      const data = response.data;
-      console.log(`${activeTab} arama verisi:`, data);
+      const response = await fetch(`/api/${activeTab}/search?query=${encodeURIComponent(query)}`);
+      const data = await response.json();
 
-      if (activeTab === 'gtip') {
+      if (activeTab === 'gtip' || activeTab === 'izahname') {
         setResults(data);
         setSearchResultsIndices([]);
         setCurrentMatchIndex(-1);
         setShowDetail(false);
         if (!data.length) {
           showToast('Eşleşme bulunamadı.', 'error');
-        }
-      } else if (activeTab === 'izahname') {
-        setResults(data);
-        setSearchResultsIndices([]);
-        setCurrentMatchIndex(-1);
-        setShowDetail(false);
-        if (!data.length) {
-          showToast('Eşleşme bulunamadı.', 'error');
+        } else {
+          showToast(`${data.length} sonuç bulundu.`, 'success');
         }
       } else if (activeTab === 'tarife' || activeTab === 'esya-fihristi') {
+        const lowerQuery = turkceLower(query);
         const matchedIndices = results.map((row, index) => {
           try {
             if (activeTab === 'tarife') {
               const col1 = turkceLower(row['1. Kolon'] || '');
               const col2 = turkceLower(row['2. Kolon'] || '');
-              return col1.includes(turkceLower(query)) || col2.includes(turkceLower(query)) ? index : -1;
+              return col1.includes(lowerQuery) || col2.includes(lowerQuery) ? index : -1;
             } else {
               const esya = turkceLower(row['Eşya'] || '');
               const armonize = turkceLower(row['Armonize Sistem'] || '');
               const notlar = turkceLower(row['İzahname Notları'] || '');
-              return esya.includes(turkceLower(query)) || armonize.includes(turkceLower(query)) || notlar.includes(turkceLower(query)) ? index : -1;
+              return esya.includes(lowerQuery) || armonize.includes(lowerQuery) || notlar.includes(lowerQuery) ? index : -1;
             }
           } catch (err) {
-            console.error('Row processing error:', err, row);
             return -1;
           }
         }).filter(index => index !== -1);
+        
         setSearchResultsIndices(matchedIndices);
         setTotalMatches(matchedIndices.length);
         setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
+        
         if (matchedIndices.length > 0 && listRef.current) {
-          listRef.current.scrollToRow(matchedIndices[0], { align: 'center' });
+          listRef.current.scrollToIndex(matchedIndices[0]);
         }
+        
         if (!matchedIndices.length) {
           showToast('Eşleşme bulunamadı.', 'error');
+        } else {
+          showToast(`${matchedIndices.length} sonuç bulundu.`, 'success');
         }
       }
     } catch (error) {
-      console.error('Arama hatası:', error);
-      showToast(`Arama sırasında bir hata oluştu: ${error.message}`, 'error');
+      showToast(`Arama sırasında bir hata oluştu.`, 'error');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeTab, query, results, turkceLower, showToast]);
 
-  const fetchDetail = async (index) => {
+  // İzahname detay verisi çekme
+  const fetchDetail = useCallback(async (index) => {
     try {
       setIsLoading(true);
-      const response = await axios.get('/api/izahname/context', {
-        params: { index },
-      });
-      setDetailResults(response.data);
+      const response = await fetch(`/api/izahname/context?index=${index}`);
+      const data = await response.json();
+      setDetailResults(data);
       setShowDetail(true);
     } catch (error) {
-      showToast(`Detay alınırken hata oluştu: ${error.message}`, 'error');
+      showToast(`Detay alınırken hata oluştu.`, 'error');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showToast]);
 
-  const nextMatch = () => {
+  // Sonraki eşleşmeye git
+  const nextMatch = useCallback(() => {
     if (searchResultsIndices.length > 0) {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev + 1) % searchResultsIndices.length;
         if (listRef.current) {
-          listRef.current.scrollToRow(searchResultsIndices[newIndex], { align: 'center' });
+          listRef.current.scrollToIndex(searchResultsIndices[newIndex]);
         }
         return newIndex;
       });
     }
-  };
+  }, [searchResultsIndices]);
 
-  const previousMatch = () => {
+  // Önceki eşleşmeye git
+  const previousMatch = useCallback(() => {
     if (searchResultsIndices.length > 0) {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev - 1 + searchResultsIndices.length) % searchResultsIndices.length;
         if (listRef.current) {
-          listRef.current.scrollToRow(searchResultsIndices[newIndex], { align: 'center' });
+          listRef.current.scrollToIndex(searchResultsIndices[newIndex]);
         }
         return newIndex;
       });
     }
-  };
+  }, [searchResultsIndices]);
 
-  const resetState = (tabId) => {
+  // Sekme değiştiğinde durumu sıfırla
+  const resetState = useCallback((tabId) => {
     setActiveTab(tabId);
     setResults([]);
     setSearchResultsIndices([]);
@@ -207,70 +335,405 @@ function App() {
     setShowDetail(false);
     setCurrentMatchIndex(-1);
     setTotalMatches(0);
-  };
+  }, []);
 
-  const tabs = [
-    { id: 'gtip', name: 'GTİP Arama', label: 'Aradığınız GTİP kodu veya kelimeleri girin:' },
-    { id: 'izahname', name: 'İzahname Arama', label: 'Aranacak kelime veya kelimeleri girin:' },
-    { id: 'tarife', name: 'Tarife Cetveli Arama', label: 'Aranacak kelime veya rakamı girin:' },
-    { id: 'esya-fihristi', name: 'Eşya Fihristi', label: 'Aranacak kelime veya rakamı girin:' },
-  ];
+  // Enter tuşunda arama yap
+  const handleKeyPress = useCallback((e) => {
+    if (e.key === 'Enter') {
+      search();
+    }
+  }, [search]);
 
-  const activeTabData = tabs.find((tab) => tab.id === activeTab);
-
-  const rowRenderer = ({ index, key, style }) => {
+  // Satır render fonksiyonu
+  const rowRenderer = useCallback(({ index, key, style }) => {
     try {
       const row = results[index];
       if (!row) return null;
 
       const isHighlighted = searchResultsIndices[currentMatchIndex] === index;
       const isMatch = searchResultsIndices.includes(index);
+      
+      const baseRowStyle = {
+        display: 'flex',
+        alignItems: 'center',
+        padding: '10px 15px',
+        borderBottom: '1px solid #e2e8f0',
+        fontSize: '14px',
+        color: '#1e293b',
+        transition: 'all 0.3s ease',
+        textAlign: 'left',
+        ...style,
+      };
+      
+      // Dinamik stil belirleme
+      const dynamicStyle = isHighlighted 
+        ? { backgroundColor: '#3b82f6', color: 'white' } 
+        : isMatch 
+          ? { backgroundColor: '#dbeafe' } 
+          : {};
+
+      const cellStyle = {
+        padding: '0 10px',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      };
+
+      const cellCodeStyle = {
+        ...cellStyle,
+        width: '150px',
+        flexShrink: 0,
+        fontWeight: '500',
+      };
+
+      const cellDescriptionStyle = {
+        ...cellStyle,
+        flex: 1,
+        minWidth: '300px',
+      };
+
+      const cellItemStyle = {
+        ...cellStyle,
+        width: '50%',
+      };
+
+      const cellHarmonizedStyle = {
+        ...cellStyle,
+        width: '25%',
+      };
+
+      const cellNotesStyle = {
+        ...cellStyle,
+        width: '25%',
+      };
 
       if (activeTab === 'gtip') {
         return (
-          <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : ''}`}>
-            <div className="cell code">{row.Kod || ''}</div>
-            <div className="cell description">{row.Tanım || ''}</div>
+          <div key={key} style={{ ...baseRowStyle, ...dynamicStyle }}>
+            <div style={cellCodeStyle}>{row.Kod || ''}</div>
+            <div style={cellDescriptionStyle}>{row.Tanım || ''}</div>
           </div>
         );
       } else if (activeTab === 'tarife') {
         return (
-          <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`}>
-            <div className="cell code">{row['1. Kolon'] || ''}</div>
-            <div className="cell description">{row['2. Kolon'] || ''}</div>
+          <div key={key} style={{ ...baseRowStyle, ...dynamicStyle }}>
+            <div style={cellCodeStyle}>{row['1. Kolon'] || ''}</div>
+            <div style={cellDescriptionStyle}>{row['2. Kolon'] || ''}</div>
           </div>
         );
       } else if (activeTab === 'esya-fihristi') {
         return (
-          <div key={key} style={style} className={`row ${isHighlighted ? 'highlight' : isMatch ? 'match' : ''}`}>
-            <div className="cell item">{row['Eşya'] || ''}</div>
-            <div className="cell harmonized">{row['Armonize Sistem'] || ''}</div>
-            <div className="cell notes">{row['İzahname Notları'] || ''}</div>
+          <div key={key} style={{ ...baseRowStyle, ...dynamicStyle }}>
+            <div style={cellItemStyle}>{row['Eşya'] || ''}</div>
+            <div style={cellHarmonizedStyle}>{row['Armonize Sistem'] || ''}</div>
+            <div style={cellNotesStyle}>{row['İzahname Notları'] || ''}</div>
           </div>
         );
       }
       return null;
     } catch (err) {
-      console.error('Row rendering error:', err);
       return (
-        <div key={key} style={style} className="row">
-          <div className="cell">Error displaying row</div>
+        <div key={key} style={{ 
+          ...style, 
+          display: 'flex',
+          padding: '10px 15px',
+          borderBottom: '1px solid #e2e8f0',
+          fontSize: '14px' 
+        }}>
+          <div style={{ padding: '0 10px' }}>Satır gösterilirken hata oluştu</div>
         </div>
       );
     }
+  }, [activeTab, results, searchResultsIndices, currentMatchIndex]);
+
+  // Gömülü stiller
+  const styles = {
+    app: {
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    },
+    header: {
+      backgroundColor: '#fff',
+      color: '#1e293b',
+      padding: '15px',
+      height: '70px',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+      display: 'flex',
+      alignItems: 'center',
+    },
+    headerTitle: {
+      fontSize: '24px',
+      fontWeight: '600',
+      marginLeft: '10px',
+    },
+    tabs: {
+      display: 'flex',
+      justifyContent: 'center',
+      backgroundColor: '#fff',
+      borderBottom: '1px solid #e2e8f0',
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+      position: 'sticky',
+      top: 0,
+      zIndex: 100,
+    },
+    tab: {
+      padding: '14px 20px',
+      backgroundColor: 'transparent',
+      color: '#64748b',
+      border: 'none',
+      fontSize: '16px',
+      fontWeight: '500',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      position: 'relative',
+      outline: 'none',
+    },
+    tabActive: {
+      color: '#2563eb',
+      fontWeight: '600',
+      boxShadow: 'inset 0 -3px 0 #2563eb',
+    },
+    content: {
+      flex: 1,
+      padding: '25px',
+      maxWidth: '1200px',
+      margin: '25px auto',
+      width: '100%',
+      backgroundColor: '#fff',
+      borderRadius: '8px',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+      position: 'relative',
+    },
+    heading: {
+      fontSize: '24px',
+      color: '#2563eb',
+      marginBottom: '20px',
+      textAlign: 'center',
+      fontWeight: '600',
+    },
+    searchContainer: {
+      marginBottom: '30px',
+      backgroundColor: '#f8fafc',
+      padding: '20px',
+      borderRadius: '8px',
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    },
+    label: {
+      fontSize: '16px',
+      color: '#1e293b',
+      display: 'block',
+      marginBottom: '10px',
+      fontWeight: '500',
+    },
+    searchForm: {
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: '10px',
+      marginBottom: '20px',
+      flexWrap: 'wrap',
+    },
+    searchInput: {
+      width: '100%',
+      maxWidth: '400px',
+      padding: '12px 15px',
+      fontSize: '16px',
+      border: '2px solid #e2e8f0',
+      borderRadius: '8px',
+      transition: 'all 0.3s ease',
+    },
+    searchButton: {
+      padding: '12px 30px',
+      backgroundColor: '#2563eb',
+      color: 'white',
+      border: 'none',
+      borderRadius: '8px',
+      fontSize: '16px',
+      fontWeight: '500',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      minWidth: '120px',
+    },
+    searchButtonDisabled: {
+      backgroundColor: '#e2e8f0',
+      cursor: 'not-allowed',
+    },
+    navButton: {
+      width: '50px',
+      height: '45px',
+      backgroundColor: '#2563eb',
+      color: 'white',
+      border: 'none',
+      borderRadius: '8px',
+      fontSize: '14px',
+      fontWeight: 'bold',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    navButtonDisabled: {
+      backgroundColor: '#e2e8f0',
+      cursor: 'not-allowed',
+    },
+    matchInfo: {
+      fontSize: '14px',
+      fontWeight: '500',
+      textAlign: 'center',
+      marginTop: '10px',
+      color: '#2563eb',
+      backgroundColor: '#dbeafe',
+      padding: '5px 10px',
+      borderRadius: '20px',
+      display: 'inline-block',
+    },
+    results: {
+      padding: '20px',
+      borderRadius: '8px',
+      backgroundColor: '#fff',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      width: '100%',
+    },
+    listContainer: {
+      border: '1px solid #e2e8f0',
+      borderRadius: '8px',
+      overflow: 'hidden',
+      width: '100%',
+      margin: '0 auto',
+      maxWidth: '1000px',
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    },
+    treeviewHeader: {
+      display: 'flex',
+      backgroundColor: '#2563eb',
+      color: 'white',
+      fontWeight: '600',
+      fontSize: '14px',
+      padding: '12px 15px',
+      textAlign: 'left',
+    },
+    headerCell: {
+      padding: '0 10px',
+    },
+    headerCellCode: {
+      width: '150px',
+      flexShrink: 0,
+    },
+    headerCellDescription: {
+      flex: 1,
+      minWidth: '300px',
+    },
+    headerCellItem: {
+      width: '50%',
+    },
+    headerCellHarmonized: {
+      width: '25%',
+    },
+    headerCellNotes: {
+      width: '25%',
+    },
+    izahnameResults: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '15px',
+      width: '100%',
+    },
+    izahnameResult: {
+      padding: '15px',
+      backgroundColor: 'white',
+      border: '1px solid #e2e8f0',
+      borderRadius: '8px',
+      transition: 'all 0.3s ease',
+    },
+    izahnameDetailContainer: {
+      maxHeight: '500px',
+      overflowY: 'auto',
+      padding: '15px',
+      border: '1px solid #e2e8f0',
+      borderRadius: '8px',
+      marginBottom: '20px',
+      lineHeight: '1.8',
+    },
+    detailButton: {
+      backgroundColor: '#2563eb',
+      color: 'white',
+      border: 'none',
+      padding: '8px 15px',
+      borderRadius: '4px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      transition: 'all 0.3s ease',
+      marginTop: '10px',
+    },
+    backButton: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      backgroundColor: '#f1f5f9',
+      color: '#1e293b',
+      border: 'none',
+      padding: '10px 15px',
+      borderRadius: '4px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      transition: 'all 0.3s ease',
+    },
+    footer: {
+      backgroundColor: '#2563eb',
+      color: 'white',
+      textAlign: 'center',
+      padding: '15px',
+      height: '50px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    loader: {
+      position: 'fixed',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      width: '50px',
+      height: '50px',
+      borderRadius: '50%',
+      border: '5px solid rgba(37, 99, 235, 0.2)',
+      borderTopColor: '#2563eb',
+      animation: 'spin 1s ease-in-out infinite',
+      zIndex: 1001,
+    },
+    emptyState: {
+      padding: '40px',
+      textAlign: 'center',
+      color: '#64748b',
+    },
+    boldText: {
+      fontWeight: '700',
+      backgroundColor: '#f0f9ff',
+      padding: '10px',
+      borderRadius: '4px',
+      margin: '15px 0',
+    },
   };
 
   return (
-    <div className="app">
-      <div className="header">
-        <h1>Gümrük Tarife Arama Uygulaması</h1>
-      </div>
+    <div style={styles.app}>
+      <header style={styles.header}>
+        <h1 style={styles.headerTitle}>Gümrük Tarife Arama Uygulaması</h1>
+      </header>
 
-      <div className="tabs">
+      <div style={styles.tabs}>
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            className={`tab ${activeTab === tab.id ? 'active' : ''}`}
+            style={{
+              ...styles.tab,
+              ...(activeTab === tab.id ? styles.tabActive : {})
+            }}
             onClick={() => resetState(tab.id)}
           >
             {tab.name}
@@ -278,91 +741,116 @@ function App() {
         ))}
       </div>
 
-      <div className="content">
-        <h2>{activeTabData.name}</h2>
-        <div className="search-container">
-          <label>{activeTabData.label}</label>
-          <div className="search">
+      <main style={styles.content}>
+        <h2 style={styles.heading}>{activeTabData.name}</h2>
+        <div style={styles.searchContainer}>
+          <label style={styles.label} htmlFor="search-input">{activeTabData.label}</label>
+          <div style={styles.searchForm}>
             {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 1 && (
               <button
                 onClick={previousMatch}
-                className="nav-button"
+                style={{
+                  ...styles.navButton,
+                  ...(searchResultsIndices.length <= 1 ? styles.navButtonDisabled : {})
+                }}
                 disabled={searchResultsIndices.length <= 1}
                 title="Önceki eşleşme"
+                aria-label="Önceki eşleşme"
               >
                 ◄
               </button>
             )}
             <input
+              id="search-input"
               ref={searchInputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && search()}
-              placeholder="Arama yapın..."
+              onKeyPress={handleKeyPress}
+              placeholder={`${activeTabData.name} için arama yapın...`}
+              aria-label="Arama"
+              style={styles.searchInput}
             />
-            <button onClick={search} disabled={isLoading}>
+            <button 
+              onClick={search} 
+              disabled={isLoading}
+              aria-label="Ara"
+              style={{
+                ...styles.searchButton,
+                ...(isLoading ? styles.searchButtonDisabled : {})
+              }}
+            >
               {isLoading ? 'Aranıyor...' : 'Ara'}
             </button>
             {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 1 && (
               <button
                 onClick={nextMatch}
-                className="nav-button"
+                style={{
+                  ...styles.navButton,
+                  ...(searchResultsIndices.length <= 1 ? styles.navButtonDisabled : {})
+                }}
                 disabled={searchResultsIndices.length <= 1}
                 title="Sonraki eşleşme"
+                aria-label="Sonraki eşleşme"
               >
                 ►
               </button>
             )}
           </div>
           {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 0 && (
-            <div className="match-info">
+            <div style={styles.matchInfo}>
               {currentMatchIndex >= 0 ? currentMatchIndex + 1 : 0} / {totalMatches} eşleşme
             </div>
           )}
         </div>
 
-        {isLoading && <div className="loader"></div>}
+        {isLoading && <div style={styles.loader} aria-label="Yükleniyor"></div>}
 
         {!isLoading && showDetail ? (
-          <div className="results izahname-detail">
-            <h3>İzahname Detay</h3>
-            <div className="detail-container">
+          <div style={styles.results}>
+            <h3 style={{ fontSize: '20px', color: '#1e293b', marginBottom: '15px', fontWeight: '500' }}>İzahname Detay</h3>
+            <div style={styles.izahnameDetailContainer}>
               {detailResults.map((result, index) => (
-                <p key={index} className={result.isBold ? 'bold' : ''}>
+                <p key={index} style={result.isBold ? styles.boldText : {}}>
                   {result.paragraph || ''}
                 </p>
               ))}
             </div>
-            <button onClick={() => setShowDetail(false)} className="back-button">
+            <button 
+              onClick={() => setShowDetail(false)}
+style={styles.backButton}
+              aria-label="Geri dön"
+            >
               <span>←</span> Geri Dön
             </button>
           </div>
         ) : (
-          <div className="results">
+          <div style={styles.results}>
             {activeTab === 'gtip' && results.length > 0 && (
-              <div className="list-container">
-                <div className="treeview-header">
-                  <div className="header-cell code">Kod</div>
-                  <div className="header-cell description">Tanım</div>
+              <div style={styles.listContainer}>
+                <div style={styles.treeviewHeader}>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>Kod</div>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellDescription }}>Tanım</div>
                 </div>
-                <List
-                  ref={listRef}
-                  width={Math.min(1000, window.innerWidth - 40)}
+                <VirtualList
+                  items={results}
                   height={400}
-                  rowCount={results.length}
-                  rowHeight={30}
+                  rowHeight={40}
                   rowRenderer={rowRenderer}
-                  className="virtual-list"
+                  ref={listRef}
                 />
               </div>
             )}
 
             {activeTab === 'izahname' && results.length > 0 && (
-              <div className="izahname-results">
+              <div style={styles.izahnameResults}>
                 {results.map((r, i) => (
-                  <div key={i} className="izahname-result">
+                  <div key={i} style={styles.izahnameResult}>
                     <p>{r.paragraph || ''}</p>
-                    <button onClick={() => fetchDetail(r.index)} className="detail-button">
+                    <button 
+                      onClick={() => fetchDetail(r.index)} 
+                      style={styles.detailButton}
+                      aria-label="İzahname detayını görüntüle"
+                    >
                       Detay...
                     </button>
                   </div>
@@ -371,50 +859,50 @@ function App() {
             )}
 
             {activeTab === 'tarife' && results.length > 0 && (
-              <div className="list-container">
-                <div className="treeview-header">
-                  <div className="header-cell code">1. Kolon</div>
-                  <div className="header-cell description">2. Kolon</div>
+              <div style={styles.listContainer}>
+                <div style={styles.treeviewHeader}>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>1. Kolon</div>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellDescription }}>2. Kolon</div>
                 </div>
-                <List
-                  ref={listRef}
-                  width={Math.min(1000, window.innerWidth - 40)}
+                <VirtualList
+                  items={results}
                   height={400}
-                  rowCount={results.length}
-                  rowHeight={30}
+                  rowHeight={40}
                   rowRenderer={rowRenderer}
-                  className="virtual-list"
-                  scrollToAlignment="center" // Satırları ortada göster
+                  ref={listRef}
                 />
               </div>
             )}
 
             {activeTab === 'esya-fihristi' && results.length > 0 && (
-              <div className="list-container">
-                <div className="treeview-header">
-                  <div className="header-cell item">Eşya</div>
-                  <div className="header-cell harmonized">Armonize Sistem</div>
-                  <div className="header-cell notes">İzahname Notları</div>
+              <div style={styles.listContainer}>
+                <div style={styles.treeviewHeader}>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellItem }}>Eşya</div>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellHarmonized }}>Armonize Sistem</div>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellNotes }}>İzahname Notları</div>
                 </div>
-                <List
-                  ref={listRef}
-                  width={Math.min(1000, window.innerWidth - 40)}
+                <VirtualList
+                  items={results}
                   height={400}
-                  rowCount={results.length}
-                  rowHeight={30}
+                  rowHeight={40}
                   rowRenderer={rowRenderer}
-                  className="virtual-list"
-                  scrollToAlignment="center" // Satırları ortada göster
+                  ref={listRef}
                 />
+              </div>
+            )}
+            
+            {results.length === 0 && !isLoading && (
+              <div style={styles.emptyState}>
+                <p>Arama yapmak için yukarıdaki form alanını kullanın</p>
               </div>
             )}
           </div>
         )}
-      </div>
+      </main>
 
-      <div className="footer">
+      <footer style={styles.footer}>
         <p>© {new Date().getFullYear()} Gümrük Tarife Arama Uygulaması</p>
-      </div>
+      </footer>
     </div>
   );
 }
