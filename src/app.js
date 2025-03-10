@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, useImperativeHandle } from 'react';
 
 // Basit sanal liste bileşeni
 const VirtualList = ({ items, height, rowHeight, rowRenderer }) => {
@@ -48,8 +48,15 @@ const VirtualList = ({ items, height, rowHeight, rowRenderer }) => {
   return (
     <div
       ref={containerRef}
-      style={{ height, overflow: 'auto', position: 'relative' }}
+      style={{ 
+        height, 
+        overflow: 'auto', 
+        position: 'relative',
+        scrollbarWidth: 'auto',
+        scrollbarColor: '#2563eb #e2e8f0'
+      }}
       onScroll={handleScroll}
+      className="custom-scrollbar"
     >
       <div style={{ height: items.length * rowHeight, position: 'relative' }}>
         {visibleItems.map(({ index, style }) => rowRenderer({ index, key: `row-${index}`, style }))}
@@ -148,7 +155,7 @@ function App() {
     }
   }, [isLoading]);
 
-  // Keyframe animasyonu için style elementi
+  // Keyframe animasyonu ve özel stiller için style elementi
   useEffect(() => {
     const styleElement = document.createElement('style');
     styleElement.textContent = `
@@ -165,6 +172,7 @@ function App() {
         line-height: 1.6;
         margin: 0;
         padding: 0;
+        overflow-y: hidden; /* Hide vertical scrollbar for the whole page */
       }
 
       * {
@@ -173,6 +181,22 @@ function App() {
       
       body.is-loading {
         overflow: hidden;
+      }
+      
+      /* Custom scrollbar styles for the entire application */
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 12px; /* Thicker scrollbar */
+      }
+      
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: #e2e8f0;
+        border-radius: 8px;
+      }
+      
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: #2563eb;
+        border-radius: 8px;
+        border: 3px solid #e2e8f0;
       }
     `;
     document.head.appendChild(styleElement);
@@ -446,25 +470,26 @@ function App() {
     }
   }, [activeTab, results, searchResultsIndices, currentMatchIndex]);
 
-  // Gömülü stiller
+  // Güncellenmiş stiller
   const styles = {
     app: {
-      minHeight: '100vh',
+      height: '100vh', // Changed from minHeight to fixed height
       display: 'flex',
       flexDirection: 'column',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      overflow: 'hidden', // Prevent scrolling on the app container
     },
     header: {
       backgroundColor: '#fff',
       color: '#1e293b',
-      padding: '15px',
-      height: '70px',
+      padding: '10px 15px', // Reduced padding
+      height: '50px', // Reduced from 70px
       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
       display: 'flex',
       alignItems: 'center',
     },
     headerTitle: {
-      fontSize: '24px',
+      fontSize: '22px', // Reduced from 24px
       fontWeight: '600',
       marginLeft: '10px',
     },
@@ -477,13 +502,14 @@ function App() {
       position: 'sticky',
       top: 0,
       zIndex: 100,
+      padding: 0, // Remove any padding
     },
     tab: {
-      padding: '14px 20px',
+      padding: '8px 16px', // Reduced padding
       backgroundColor: 'transparent',
       color: '#64748b',
       border: 'none',
-      fontSize: '16px',
+      fontSize: '15px', // Reduced from 16px
       fontWeight: '500',
       cursor: 'pointer',
       transition: 'all 0.3s ease',
@@ -497,34 +523,35 @@ function App() {
     },
     content: {
       flex: 1,
-      padding: '25px',
+      padding: '15px', // Reduced padding
       maxWidth: '1200px',
-      margin: '25px auto',
+      margin: '10px auto', // Reduced margins
       width: '100%',
       backgroundColor: '#fff',
       borderRadius: '8px',
       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
       position: 'relative',
+      overflowY: 'auto', // Enable vertical scrolling inside the content
     },
     heading: {
-      fontSize: '24px',
+      fontSize: '20px', // Reduced from 24px
       color: '#2563eb',
-      marginBottom: '20px',
+      marginBottom: '15px', // Reduced from 20px
       textAlign: 'center',
       fontWeight: '600',
     },
     searchContainer: {
-      marginBottom: '30px',
+      marginBottom: '20px', // Reduced from 30px
       backgroundColor: '#f8fafc',
-      padding: '20px',
+      padding: '15px', // Reduced from 20px
       borderRadius: '8px',
       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
     },
     label: {
-      fontSize: '16px',
+      fontSize: '15px', // Reduced from 16px
       color: '#1e293b',
       display: 'block',
-      marginBottom: '10px',
+      marginBottom: '6px', // Reduced from 10px
       fontWeight: '500',
     },
     searchForm: {
@@ -532,37 +559,37 @@ function App() {
       justifyContent: 'center',
       alignItems: 'center',
       gap: '10px',
-      marginBottom: '20px',
+      marginBottom: '15px', // Reduced from 20px
       flexWrap: 'wrap',
     },
     searchInput: {
       width: '100%',
       maxWidth: '400px',
-      padding: '12px 15px',
-      fontSize: '16px',
+      padding: '10px 15px', // Reduced from 12px 15px
+      fontSize: '15px', // Reduced from 16px
       border: '2px solid #e2e8f0',
       borderRadius: '8px',
       transition: 'all 0.3s ease',
     },
     searchButton: {
-      padding: '12px 30px',
+      padding: '10px 25px', // Reduced from 12px 30px
       backgroundColor: '#2563eb',
       color: 'white',
       border: 'none',
       borderRadius: '8px',
-      fontSize: '16px',
+      fontSize: '15px', // Reduced from 16px
       fontWeight: '500',
       cursor: 'pointer',
       transition: 'all 0.3s ease',
-      minWidth: '120px',
+      minWidth: '110px', // Reduced from 120px
     },
     searchButtonDisabled: {
       backgroundColor: '#e2e8f0',
       cursor: 'not-allowed',
     },
     navButton: {
-      width: '50px',
-      height: '45px',
+      width: '45px', // Reduced from 50px
+      height: '38px', // Reduced from 45px
       backgroundColor: '#2563eb',
       color: 'white',
       border: 'none',
@@ -583,7 +610,7 @@ function App() {
       fontSize: '14px',
       fontWeight: '500',
       textAlign: 'center',
-      marginTop: '10px',
+      marginTop: '8px', // Reduced from 10px
       color: '#2563eb',
       backgroundColor: '#dbeafe',
       padding: '5px 10px',
@@ -591,7 +618,7 @@ function App() {
       display: 'inline-block',
     },
     results: {
-      padding: '20px',
+      padding: '15px', // Reduced from 20px
       borderRadius: '8px',
       backgroundColor: '#fff',
       display: 'flex',
@@ -614,7 +641,7 @@ function App() {
       color: 'white',
       fontWeight: '600',
       fontSize: '14px',
-      padding: '12px 15px',
+      padding: '10px 15px', // Reduced from 12px 15px
       textAlign: 'left',
     },
     headerCell: {
@@ -687,8 +714,8 @@ function App() {
       backgroundColor: '#2563eb',
       color: 'white',
       textAlign: 'center',
-      padding: '15px',
-      height: '50px',
+      padding: '10px 15px', // Reduced from 15px
+      height: '40px', // Reduced from 50px
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -707,7 +734,7 @@ function App() {
       zIndex: 1001,
     },
     emptyState: {
-      padding: '40px',
+      padding: '30px', // Reduced from 40px
       textAlign: 'center',
       color: '#64748b',
     },
@@ -741,7 +768,7 @@ function App() {
         ))}
       </div>
 
-      <main style={styles.content}>
+      <main style={styles.content} className="custom-scrollbar">
         <h2 style={styles.heading}>{activeTabData.name}</h2>
         <div style={styles.searchContainer}>
           <label style={styles.label} htmlFor="search-input">{activeTabData.label}</label>
@@ -788,8 +815,8 @@ function App() {
                   ...styles.navButton,
                   ...(searchResultsIndices.length <= 1 ? styles.navButtonDisabled : {})
                 }}
-                disabled={searchResultsIndices.length <= 1}
-                title="Sonraki eşleşme"
+                disabled={searchResultsIndices.length <= 1 ? styles.navButtonDisabled : {})
+                  title="Sonraki eşleşme"
                 aria-label="Sonraki eşleşme"
               >
                 ►
@@ -807,8 +834,8 @@ function App() {
 
         {!isLoading && showDetail ? (
           <div style={styles.results}>
-            <h3 style={{ fontSize: '20px', color: '#1e293b', marginBottom: '15px', fontWeight: '500' }}>İzahname Detay</h3>
-            <div style={styles.izahnameDetailContainer}>
+            <h3 style={{ fontSize: '18px', color: '#1e293b', marginBottom: '15px', fontWeight: '500' }}>İzahname Detay</h3>
+            <div style={styles.izahnameDetailContainer} className="custom-scrollbar">
               {detailResults.map((result, index) => (
                 <p key={index} style={result.isBold ? styles.boldText : {}}>
                   {result.paragraph || ''}
@@ -817,7 +844,7 @@ function App() {
             </div>
             <button 
               onClick={() => setShowDetail(false)}
-style={styles.backButton}
+              style={styles.backButton}
               aria-label="Geri dön"
             >
               <span>←</span> Geri Dön
@@ -833,7 +860,7 @@ style={styles.backButton}
                 </div>
                 <VirtualList
                   items={results}
-                  height={400}
+                  height={350} // Reduced height to fit within the viewport
                   rowHeight={40}
                   rowRenderer={rowRenderer}
                   ref={listRef}
@@ -866,7 +893,7 @@ style={styles.backButton}
                 </div>
                 <VirtualList
                   items={results}
-                  height={400}
+                  height={350} // Reduced height to fit within the viewport
                   rowHeight={40}
                   rowRenderer={rowRenderer}
                   ref={listRef}
@@ -883,7 +910,7 @@ style={styles.backButton}
                 </div>
                 <VirtualList
                   items={results}
-                  height={400}
+                  height={350} // Reduced height to fit within the viewport
                   rowHeight={40}
                   rowRenderer={rowRenderer}
                   ref={listRef}
