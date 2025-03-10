@@ -1,73 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-
-// Basit sanal liste bileşeni
-const VirtualList = ({ items, height, rowHeight, rowRenderer }) => {
-  const containerRef = useRef(null);
-  const [scrollTop, setScrollTop] = useState(0);
-  const [visibleItems, setVisibleItems] = useState([]);
-
-  // Kaydırma işlemi sonucunda görünür öğeleri hesapla
-  useEffect(() => {
-    if (!items || !containerRef.current) return;
-    
-    const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight));
-    const endIndex = Math.min(
-      items.length - 1,
-      Math.floor((scrollTop + height) / rowHeight)
-    );
-    
-    const visibleRows = [];
-    for (let i = startIndex; i <= endIndex; i++) {
-      visibleRows.push({
-        index: i,
-        item: items[i],
-        style: {
-          position: 'absolute',
-          top: i * rowHeight,
-          height: rowHeight,
-          left: 0,
-          right: 0
-        }
-      });
-    }
-    
-    setVisibleItems(visibleRows);
-  }, [items, scrollTop, height, rowHeight]);
-
-  const scrollToIndex = useCallback((index) => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = index * rowHeight;
-    }
-  }, [rowHeight]);
-
-  const handleScroll = (e) => {
-    setScrollTop(e.target.scrollTop);
-  };
-
-  // Expose scrollToIndex to parent via ref
-  useImperativeHandle(containerRef, () => ({
-    scrollToIndex,
-  }), [scrollToIndex]);
-
-  return (
-    <div
-      ref={containerRef}
-      style={{ 
-        height, 
-        overflow: 'auto', 
-        position: 'relative',
-        scrollbarWidth: 'auto',
-        scrollbarColor: '#2563eb #e2e8f0'
-      }}
-      onScroll={handleScroll}
-      className="custom-scrollbar"
-    >
-      <div style={{ height: items.length * rowHeight, position: 'relative' }}>
-        {visibleItems.map(({ index, style }) => rowRenderer({ index, key: `row-${index}`, style }))}
-      </div>
-    </div>
-  );
-};
+import VirtualList from './VirtualList';
 
 function App() {
   const [activeTab, setActiveTab] = useState('gtip');
@@ -120,16 +52,22 @@ function App() {
           setResults(data);
           setSearchResultsIndices([]);
           setCurrentMatchIndex(-1);
+          setTotalMatches(0);
         } else if (activeTab === 'esya-fihristi') {
           response = await fetch('/api/esya-fihristi/all');
           data = await response.json();
           setResults(data);
           setSearchResultsIndices([]);
           setCurrentMatchIndex(-1);
+          setTotalMatches(0);
         } else {
           setResults([]);
+          setSearchResultsIndices([]);
+          setCurrentMatchIndex(-1);
+          setTotalMatches(0);
         }
       } catch (error) {
+        console.error('Veri yükleme hatası:', error);
         showToast('Veri yüklenirken bir hata oluştu.', 'error');
       } finally {
         setIsLoading(false);
@@ -258,37 +196,58 @@ function App() {
 
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/${activeTab}/search?query=${encodeURIComponent(query)}`);
-      const data = await response.json();
-
+      
       if (activeTab === 'gtip' || activeTab === 'izahname') {
+        const response = await fetch(`/api/${activeTab}/search?query=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        
         setResults(data);
         setSearchResultsIndices([]);
         setCurrentMatchIndex(-1);
         setShowDetail(false);
+        
         if (!data.length) {
           showToast('Eşleşme bulunamadı.', 'error');
         } else {
           showToast(`${data.length} sonuç bulundu.`, 'success');
         }
       } else if (activeTab === 'tarife' || activeTab === 'esya-fihristi') {
+        // Önce tüm veriyi yüklediğimizden emin olalım
+        if (results.length === 0) {
+          const allDataResponse = await fetch(`/api/${activeTab}/all`);
+          const allData = await allDataResponse.json();
+          setResults(allData);
+        }
+        
         const lowerQuery = turkceLower(query);
-        const matchedIndices = results.map((row, index) => {
-          try {
-            if (activeTab === 'tarife') {
+        let matchedIndices = [];
+        
+        if (activeTab === 'tarife') {
+          matchedIndices = results.map((row, index) => {
+            try {
+              if (!row) return -1;
               const col1 = turkceLower(row['1. Kolon'] || '');
               const col2 = turkceLower(row['2. Kolon'] || '');
               return col1.includes(lowerQuery) || col2.includes(lowerQuery) ? index : -1;
-            } else {
+            } catch (err) {
+              console.error('Tarife eşleşme hatası:', err);
+              return -1;
+            }
+          }).filter(index => index !== -1);
+        } else { // esya-fihristi
+          matchedIndices = results.map((row, index) => {
+            try {
+              if (!row) return -1;
               const esya = turkceLower(row['Eşya'] || '');
               const armonize = turkceLower(row['Armonize Sistem'] || '');
               const notlar = turkceLower(row['İzahname Notları'] || '');
               return esya.includes(lowerQuery) || armonize.includes(lowerQuery) || notlar.includes(lowerQuery) ? index : -1;
+            } catch (err) {
+              console.error('Eşya fihristi eşleşme hatası:', err);
+              return -1;
             }
-          } catch (err) {
-            return -1;
-          }
-        }).filter(index => index !== -1);
+          }).filter(index => index !== -1);
+        }
         
         setSearchResultsIndices(matchedIndices);
         setTotalMatches(matchedIndices.length);
@@ -305,6 +264,7 @@ function App() {
         }
       }
     } catch (error) {
+      console.error('Arama hatası:', error);
       showToast(`Arama sırasında bir hata oluştu.`, 'error');
     } finally {
       setIsLoading(false);
@@ -320,6 +280,7 @@ function App() {
       setDetailResults(data);
       setShowDetail(true);
     } catch (error) {
+      console.error('Detay alma hatası:', error);
       showToast(`Detay alınırken hata oluştu.`, 'error');
     } finally {
       setIsLoading(false);
@@ -457,6 +418,7 @@ function App() {
       }
       return null;
     } catch (err) {
+      console.error('Satır render hatası:', err);
       return (
         <div key={key} style={{ 
           ...style, 
@@ -798,7 +760,7 @@ function App() {
               aria-label="Arama"
               style={styles.searchInput}
             />
-            <button 
+<button 
               onClick={search} 
               disabled={isLoading}
               aria-label="Ara"
@@ -816,7 +778,7 @@ function App() {
                   ...styles.navButton,
                   ...(searchResultsIndices.length <= 1 ? styles.navButtonDisabled : {})
                 }}
-                disabled={searchResultsIndices.length <= 1} // Fixed: Boolean value instead of style object
+                disabled={searchResultsIndices.length <= 1}
                 title="Sonraki eşleşme"
                 aria-label="Sonraki eşleşme"
               >
