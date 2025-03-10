@@ -158,8 +158,17 @@ function App() {
     try {
       setIsLoading(true);
       
-      if (activeTab === 'gtip' || activeTab === 'izahname') {
-        const response = await fetch(`/api/${activeTab}/search?query=${encodeURIComponent(query)}`);
+      if (activeTab === 'gtip') {
+        // GTİP araması yapıldığında önceki GTİP sonuçlarını temizle
+        setResults([]); // Yeni arama yapılırken eski sonuçları temizle
+        const response = await fetch(`/api/gtip/search?query=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        setResults(data || []);
+        setSearchResultsIndices([]);
+        setCurrentMatchIndex(-1);
+        setShowDetail(false);
+      } else if (activeTab === 'izahname') {
+        const response = await fetch(`/api/izahname/search?query=${encodeURIComponent(query)}`);
         const data = await response.json();
         setResults(data || []);
         setSearchResultsIndices([]);
@@ -230,7 +239,6 @@ function App() {
       setIsLoading(false);
     }
   }, []);
-
   // Sonraki eşleşmeye git
   const nextMatch = useCallback(() => {
     if (searchResultsIndices.length > 0) {
@@ -269,21 +277,16 @@ function App() {
   const resetState = useCallback((tabId) => {
     setActiveTab(tabId);
     
-    // GTİP arama sekmesine geçerken sonuçları koruyalım, 
-    // diğer sekmelerde her zamanki gibi temizleyelim
+    // GTİP haricindeki sekmeler için değişiklikleri temizle
     if (tabId !== 'gtip') {
-      setResults([]);
+      // GTİP sonuçlarını korumak için results ve query'i değiştirmiyoruz
+      // Sadece diğer durum değişkenlerini temizliyoruz
       setSearchResultsIndices([]);
-      setQuery('');
       setShowDetail(false);
       setCurrentMatchIndex(-1);
       setTotalMatches(0);
-    } else if (activeTab !== 'gtip') {
-      // Başka bir sekmeden GTİP'e geçiliyorsa, önceki arama sorgusunu koruyalım
-      // ama temiz bir sonuç listesi gösterelim, kullanıcı tekrar arama yapabilir
-      setResults([]);
     }
-  }, [activeTab]);
+  }, []);
 
   // Enter tuşunda arama yap
   const handleKeyPress = useCallback((e) => {
@@ -801,22 +804,22 @@ function App() {
 </button>
           </div>
         ) : (
-          <div style={styles.results}>
-{activeTab === 'gtip' && results.length > 0 && (
-  <div style={styles.listContainer}>
-    <div style={styles.treeviewHeader}>
-      <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>Kod</div>
-      <div style={{ ...styles.headerCell, ...styles.headerCellDescription }}>Tanım</div>
-    </div>
-    <VirtualList
-      items={results}
-      height={350}
-      rowHeight={40}
-      rowRenderer={rowRenderer}
-      ref={listRef}
-    />
-  </div>
-)}
+<div style={styles.results}>
+            {activeTab === 'gtip' && results.length > 0 && (
+              <div style={styles.listContainer}>
+                <div style={styles.treeviewHeader}>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>Kod</div>
+                  <div style={{ ...styles.headerCell, ...styles.headerCellDescription }}>Tanım</div>
+                </div>
+                <VirtualList
+                  items={results}
+                  height={350}
+                  rowHeight={40}
+                  rowRenderer={rowRenderer}
+                  ref={listRef}
+                />
+              </div>
+            )}
 
             {activeTab === 'izahname' && results.length > 0 && (
               <div style={styles.izahnameResults}>
