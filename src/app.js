@@ -194,10 +194,11 @@ function App() {
         setTotalMatches(matchedIndices.length);
         setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
         
+        // Eşleşme varsa, ilk eşleşmeyi ekranın ortasına getir
         if (matchedIndices.length > 0 && listRef.current) {
           listRef.current.scrollToIndex({
             index: matchedIndices[0],
-            align: 'center', // İlk eşleşmeyi sayfa ortasına kaydırır
+            align: 'center'
           });
         }
       }
@@ -232,10 +233,11 @@ function App() {
     if (searchResultsIndices.length > 0) {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev + 1) % searchResultsIndices.length;
+        // Sonraki eşleşmeyi ekranın ortasına getir
         if (listRef.current) {
           listRef.current.scrollToIndex({
             index: searchResultsIndices[newIndex],
-            align: 'center', // Sonraki eşleşmeyi sayfa ortasına kaydırır
+            align: 'center'
           });
         }
         return newIndex;
@@ -248,10 +250,11 @@ function App() {
     if (searchResultsIndices.length > 0) {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev - 1 + searchResultsIndices.length) % searchResultsIndices.length;
+        // Önceki eşleşmeyi ekranın ortasına getir
         if (listRef.current) {
           listRef.current.scrollToIndex({
             index: searchResultsIndices[newIndex],
-            align: 'center', // Önceki eşleşmeyi sayfa ortasına kaydırır
+            align: 'center'
           });
         }
         return newIndex;
