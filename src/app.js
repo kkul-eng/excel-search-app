@@ -750,10 +750,11 @@ function App() {
 
         {activeTab === 'gtip' && results.length === 0 && !isLoading && (
           <div style={{ ...styles.emptyState, paddingBottom: 0 }}>
+            <p>- Bu sayfada;</p>
             <p>- 3824 veya 382410 şeklinde GTİP kodu ile aralarda noktalama işareti olmadan arama,</p>
             <p>- dokunmuş boyalı poliester pamuk devamsız mensucat şeklinde aramak yerine,</p>
             <p>  yazım sırası önemli olmadan; do bo pa po de me şeklinde arama,</p>
-            <p>  Tereftalik asit şeklinde arama,</p>
+            <p>  veya sülfirik veya sülfirik asit şeklinde arama,</p>
             <p>  yapabilirsiniz.</p>
           </div>
         )}
