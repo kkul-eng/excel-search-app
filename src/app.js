@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 
 // Basit sanal liste bileşeni
 const VirtualList = ({ items, height, rowHeight, rowRenderer }) => {
@@ -34,7 +34,6 @@ const VirtualList = ({ items, height, rowHeight, rowRenderer }) => {
     setVisibleItems(visibleRows);
   }, [items, scrollTop, height, rowHeight]);
 
-  // Belirli bir öğeye kaydırma işlevi
   const scrollToIndex = useCallback((index) => {
     if (containerRef.current) {
       containerRef.current.scrollTop = index * rowHeight;
@@ -44,6 +43,11 @@ const VirtualList = ({ items, height, rowHeight, rowRenderer }) => {
   const handleScroll = (e) => {
     setScrollTop(e.target.scrollTop);
   };
+
+  // Expose scrollToIndex to parent via ref
+  useImperativeHandle(containerRef, () => ({
+    scrollToIndex,
+  }), [scrollToIndex]);
 
   return (
     <div
@@ -76,7 +80,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [totalMatches, setTotalMatches] = useState(0);
   const searchInputRef = useRef(null);
-  const listRef = useRef({ scrollToIndex: () => {} });
+  const listRef = useRef(null);
 
   // Türkçe karakter dönüşümü
   const turkceLower = useCallback((text) => {
@@ -134,7 +138,6 @@ function App() {
     
     loadInitialData();
 
-    // Kısayol tuşu dinleyicisi
     const handleKeyDown = (e) => {
       if (e.ctrlKey && e.key === 'f') {
         e.preventDefault();
@@ -172,7 +175,7 @@ function App() {
         line-height: 1.6;
         margin: 0;
         padding: 0;
-        overflow-y: hidden; /* Hide vertical scrollbar for the whole page */
+        overflow-y: hidden;
       }
 
       * {
@@ -183,9 +186,8 @@ function App() {
         overflow: hidden;
       }
       
-      /* Custom scrollbar styles for the entire application */
       .custom-scrollbar::-webkit-scrollbar {
-        width: 12px; /* Thicker scrollbar */
+        width: 12px;
       }
       
       .custom-scrollbar::-webkit-scrollbar-track {
@@ -389,7 +391,6 @@ function App() {
         ...style,
       };
       
-      // Dinamik stil belirleme
       const dynamicStyle = isHighlighted 
         ? { backgroundColor: '#3b82f6', color: 'white' } 
         : isMatch 
@@ -473,23 +474,23 @@ function App() {
   // Güncellenmiş stiller
   const styles = {
     app: {
-      height: '100vh', // Changed from minHeight to fixed height
+      height: '100vh',
       display: 'flex',
       flexDirection: 'column',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-      overflow: 'hidden', // Prevent scrolling on the app container
+      overflow: 'hidden',
     },
     header: {
       backgroundColor: '#fff',
       color: '#1e293b',
-      padding: '10px 15px', // Reduced padding
-      height: '50px', // Reduced from 70px
+      padding: '10px 15px',
+      height: '50px',
       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
       display: 'flex',
       alignItems: 'center',
     },
     headerTitle: {
-      fontSize: '22px', // Reduced from 24px
+      fontSize: '22px',
       fontWeight: '600',
       marginLeft: '10px',
     },
@@ -502,14 +503,14 @@ function App() {
       position: 'sticky',
       top: 0,
       zIndex: 100,
-      padding: 0, // Remove any padding
+      padding: 0,
     },
     tab: {
-      padding: '8px 16px', // Reduced padding
+      padding: '8px 16px',
       backgroundColor: 'transparent',
       color: '#64748b',
       border: 'none',
-      fontSize: '15px', // Reduced from 16px
+      fontSize: '15px',
       fontWeight: '500',
       cursor: 'pointer',
       transition: 'all 0.3s ease',
@@ -523,35 +524,35 @@ function App() {
     },
     content: {
       flex: 1,
-      padding: '15px', // Reduced padding
+      padding: '15px',
       maxWidth: '1200px',
-      margin: '10px auto', // Reduced margins
+      margin: '10px auto',
       width: '100%',
       backgroundColor: '#fff',
       borderRadius: '8px',
       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
       position: 'relative',
-      overflowY: 'auto', // Enable vertical scrolling inside the content
+      overflowY: 'auto',
     },
     heading: {
-      fontSize: '20px', // Reduced from 24px
+      fontSize: '20px',
       color: '#2563eb',
-      marginBottom: '15px', // Reduced from 20px
+      marginBottom: '15px',
       textAlign: 'center',
       fontWeight: '600',
     },
     searchContainer: {
-      marginBottom: '20px', // Reduced from 30px
+      marginBottom: '20px',
       backgroundColor: '#f8fafc',
-      padding: '15px', // Reduced from 20px
+      padding: '15px',
       borderRadius: '8px',
       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
     },
     label: {
-      fontSize: '15px', // Reduced from 16px
+      fontSize: '15px',
       color: '#1e293b',
       display: 'block',
-      marginBottom: '6px', // Reduced from 10px
+      marginBottom: '6px',
       fontWeight: '500',
     },
     searchForm: {
@@ -559,37 +560,37 @@ function App() {
       justifyContent: 'center',
       alignItems: 'center',
       gap: '10px',
-      marginBottom: '15px', // Reduced from 20px
+      marginBottom: '15px',
       flexWrap: 'wrap',
     },
     searchInput: {
       width: '100%',
       maxWidth: '400px',
-      padding: '10px 15px', // Reduced from 12px 15px
-      fontSize: '15px', // Reduced from 16px
+      padding: '10px 15px',
+      fontSize: '15px',
       border: '2px solid #e2e8f0',
       borderRadius: '8px',
       transition: 'all 0.3s ease',
     },
     searchButton: {
-      padding: '10px 25px', // Reduced from 12px 30px
+      padding: '10px 25px',
       backgroundColor: '#2563eb',
       color: 'white',
       border: 'none',
       borderRadius: '8px',
-      fontSize: '15px', // Reduced from 16px
+      fontSize: '15px',
       fontWeight: '500',
       cursor: 'pointer',
       transition: 'all 0.3s ease',
-      minWidth: '110px', // Reduced from 120px
+      minWidth: '110px',
     },
     searchButtonDisabled: {
       backgroundColor: '#e2e8f0',
       cursor: 'not-allowed',
     },
     navButton: {
-      width: '45px', // Reduced from 50px
-      height: '38px', // Reduced from 45px
+      width: '45px',
+      height: '38px',
       backgroundColor: '#2563eb',
       color: 'white',
       border: 'none',
@@ -610,7 +611,7 @@ function App() {
       fontSize: '14px',
       fontWeight: '500',
       textAlign: 'center',
-      marginTop: '8px', // Reduced from 10px
+      marginTop: '8px',
       color: '#2563eb',
       backgroundColor: '#dbeafe',
       padding: '5px 10px',
@@ -618,7 +619,7 @@ function App() {
       display: 'inline-block',
     },
     results: {
-      padding: '15px', // Reduced from 20px
+      padding: '15px',
       borderRadius: '8px',
       backgroundColor: '#fff',
       display: 'flex',
@@ -641,7 +642,7 @@ function App() {
       color: 'white',
       fontWeight: '600',
       fontSize: '14px',
-      padding: '10px 15px', // Reduced from 12px 15px
+      padding: '10px 15px',
       textAlign: 'left',
     },
     headerCell: {
@@ -714,8 +715,8 @@ function App() {
       backgroundColor: '#2563eb',
       color: 'white',
       textAlign: 'center',
-      padding: '10px 15px', // Reduced from 15px
-      height: '40px', // Reduced from 50px
+      padding: '10px 15px',
+      height: '40px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -734,7 +735,7 @@ function App() {
       zIndex: 1001,
     },
     emptyState: {
-      padding: '30px', // Reduced from 40px
+      padding: '30px',
       textAlign: 'center',
       color: '#64748b',
     },
@@ -815,8 +816,8 @@ function App() {
                   ...styles.navButton,
                   ...(searchResultsIndices.length <= 1 ? styles.navButtonDisabled : {})
                 }}
-                disabled={searchResultsIndices.length <= 1 ? styles.navButtonDisabled : {})
-                  title="Sonraki eşleşme"
+                disabled={searchResultsIndices.length <= 1} // Fixed: Boolean value instead of style object
+                title="Sonraki eşleşme"
                 aria-label="Sonraki eşleşme"
               >
                 ►
@@ -860,7 +861,7 @@ function App() {
                 </div>
                 <VirtualList
                   items={results}
-                  height={350} // Reduced height to fit within the viewport
+                  height={350}
                   rowHeight={40}
                   rowRenderer={rowRenderer}
                   ref={listRef}
@@ -893,7 +894,7 @@ function App() {
                 </div>
                 <VirtualList
                   items={results}
-                  height={350} // Reduced height to fit within the viewport
+                  height={350}
                   rowHeight={40}
                   rowRenderer={rowRenderer}
                   ref={listRef}
@@ -910,7 +911,7 @@ function App() {
                 </div>
                 <VirtualList
                   items={results}
-                  height={350} // Reduced height to fit within the viewport
+                  height={350}
                   rowHeight={40}
                   rowRenderer={rowRenderer}
                   ref={listRef}
