@@ -208,6 +208,8 @@ function App() {
         
         if (!data.length) {
           showToast('Eşleşme bulunamadı.', 'error');
+        } else {
+          showToast(`${data.length} sonuç bulundu.`, 'success');
         }
       } else if (activeTab === 'tarife' || activeTab === 'esya-fihristi') {
         // Önce tüm veriyi yüklediğimizden emin olalım
@@ -257,6 +259,8 @@ function App() {
         
         if (!matchedIndices.length) {
           showToast('Eşleşme bulunamadı.', 'error');
+        } else {
+          showToast(`${matchedIndices.length} sonuç bulundu.`, 'success');
         }
       }
     } catch (error) {
@@ -586,8 +590,8 @@ function App() {
       flexDirection: 'column',
       alignItems: 'center',
       width: '100%',
-      flex: 1, // Yeni - dikey yerleşim için
-      justifyContent: 'center', // Yeni - dikey yerleşim için
+      flex: 1,
+      justifyContent: 'center',
     },
     listContainer: {
       border: '1px solid #e2e8f0',
@@ -761,8 +765,6 @@ function App() {
               style={styles.searchInput}
             />
             <button 
-              onClick={search}
-<button 
               onClick={search} 
               disabled={isLoading}
               aria-label="Ara"
