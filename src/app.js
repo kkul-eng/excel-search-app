@@ -652,7 +652,7 @@ function App() {
     },
     emptyState: {
       padding: '30px',
-      textAlign: 'left', // Yazıları sola yaslamak için güncellendi
+      textAlign: 'left', // Yazıları sola yaslı tutar
       color: '#64748b',
     },
     boldText: {
@@ -750,12 +750,20 @@ function App() {
 
         {activeTab === 'gtip' && results.length === 0 && !isLoading && (
           <div style={{ ...styles.emptyState, paddingBottom: 0 }}>
-            <p>- Bu sayfada;</p>
             <p>- 3824 veya 382410 şeklinde GTİP kodu ile aralarda noktalama işareti olmadan arama,</p>
             <p>- dokunmuş boyalı poliester pamuk devamsız mensucat şeklinde aramak yerine,</p>
-            <p>  yazım sırası önemli olmadan; do bo pa po de me şeklinde arama,</p>
-            <p>  veya sülfirik veya sülfirik asit şeklinde arama,</p>
-            <p>  yapabilirsiniz.</p>
+            <p>   yazım sırası önemli olmadan; do bo pa po de me şeklinde arama,</p>
+            <p>   Tereftalik asit şeklinde arama,</p>
+            <p>    yapabilirsiniz.</p>
+          </div>
+        )}
+
+        {activeTab === 'izahname' && results.length === 0 && !isLoading && !showDetail && (
+          <div style={{ ...styles.emptyState, paddingBottom: 0 }}>
+            <p> Bu sayfada;</p>
+            <p> - izahnamede aramak istediğiniz kelime veya kelimelerle arama,</p>
+            <p> - Herhangi bir fasıl için arama yapmak istediğinizde 59.03 gibi arama</p>
+            <p>  yapabilirsiniz</p>
           </div>
         )}
 
@@ -847,7 +855,7 @@ function App() {
               </div>
             )}
             
-            {results.length === 0 && !isLoading && activeTab !== 'gtip' && (
+            {results.length === 0 && !isLoading && activeTab !== 'gtip' && activeTab !== 'izahname' && (
               <div style={styles.emptyState}>
                 <p>Arama yapmak için yukarıdaki form alanını kullanın</p>
               </div>
