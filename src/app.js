@@ -49,14 +49,14 @@ function App() {
         if (activeTab === 'tarife') {
           response = await fetch('/api/tarife/all');
           data = await response.json();
-          setResults(data);
+          setResults(data || []);
           setSearchResultsIndices([]);
           setCurrentMatchIndex(-1);
           setTotalMatches(0);
         } else if (activeTab === 'esya-fihristi') {
           response = await fetch('/api/esya-fihristi/all');
           data = await response.json();
-          setResults(data);
+          setResults(data || []);
           setSearchResultsIndices([]);
           setCurrentMatchIndex(-1);
           setTotalMatches(0);
@@ -68,6 +68,7 @@ function App() {
         }
       } catch (error) {
         console.error('Veri yükleme hatası:', error);
+        setResults([]);
       } finally {
         setIsLoading(false);
       }
@@ -157,46 +158,35 @@ function App() {
       if (activeTab === 'gtip' || activeTab === 'izahname') {
         const response = await fetch(`/api/${activeTab}/search?query=${encodeURIComponent(query)}`);
         const data = await response.json();
-        
-        setResults(data);
+        setResults(data || []);
         setSearchResultsIndices([]);
         setCurrentMatchIndex(-1);
         setShowDetail(false);
       } else if (activeTab === 'tarife' || activeTab === 'esya-fihristi') {
-        // Önce tüm veriyi yüklediğimizden emin olalım
-        if (results.length === 0) {
+        let allData = results;
+        if (allData.length === 0) {
           const allDataResponse = await fetch(`/api/${activeTab}/all`);
-          const allData = await allDataResponse.json();
-          setResults(allData);
+          allData = await allDataResponse.json();
+          setResults(allData || []);
         }
         
         const lowerQuery = turkceLower(query);
         let matchedIndices = [];
         
         if (activeTab === 'tarife') {
-          matchedIndices = results.map((row, index) => {
-            try {
-              if (!row) return -1;
-              const col1 = turkceLower(row['1. Kolon'] || '');
-              const col2 = turkceLower(row['2. Kolon'] || '');
-              return col1.includes(lowerQuery) || col2.includes(lowerQuery) ? index : -1;
-            } catch (err) {
-              console.error('Tarife eşleşme hatası:', err);
-              return -1;
-            }
+          matchedIndices = allData.map((row, index) => {
+            if (!row) return -1;
+            const col1 = turkceLower(row['1. Kolon'] || '');
+            const col2 = turkceLower(row['2. Kolon'] || '');
+            return col1.includes(lowerQuery) || col2.includes(lowerQuery) ? index : -1;
           }).filter(index => index !== -1);
         } else { // esya-fihristi
-          matchedIndices = results.map((row, index) => {
-            try {
-              if (!row) return -1;
-              const esya = turkceLower(row['Eşya'] || '');
-              const armonize = turkceLower(row['Armonize Sistem'] || '');
-              const notlar = turkceLower(row['İzahname Notları'] || '');
-              return esya.includes(lowerQuery) || armonize.includes(lowerQuery) || notlar.includes(lowerQuery) ? index : -1;
-            } catch (err) {
-              console.error('Eşya fihristi eşleşme hatası:', err);
-              return -1;
-            }
+          matchedIndices = allData.map((row, index) => {
+            if (!row) return -1;
+            const esya = turkceLower(row['Eşya'] || '');
+            const armonize = turkceLower(row['Armonize Sistem'] || '');
+            const notlar = turkceLower(row['İzahname Notları'] || '');
+            return esya.includes(lowerQuery) || armonize.includes(lowerQuery) || notlar.includes(lowerQuery) ? index : -1;
           }).filter(index => index !== -1);
         }
         
@@ -207,12 +197,16 @@ function App() {
         if (matchedIndices.length > 0 && listRef.current) {
           listRef.current.scrollToIndex({
             index: matchedIndices[0],
-            align: 'center', // Satırı ortalar
+            align: 'center', // İlk eşleşmeyi sayfa ortasına kaydırır
           });
         }
       }
     } catch (error) {
       console.error('Arama hatası:', error);
+      setResults([]);
+      setSearchResultsIndices([]);
+      setCurrentMatchIndex(-1);
+      setTotalMatches(0);
     } finally {
       setIsLoading(false);
     }
@@ -224,7 +218,7 @@ function App() {
       setIsLoading(true);
       const response = await fetch(`/api/izahname/context?index=${index}`);
       const data = await response.json();
-      setDetailResults(data);
+      setDetailResults(data || []);
       setShowDetail(true);
     } catch (error) {
       console.error('Detay alma hatası:', error);
@@ -241,7 +235,7 @@ function App() {
         if (listRef.current) {
           listRef.current.scrollToIndex({
             index: searchResultsIndices[newIndex],
-            align: 'center', // Satırı ortalar
+            align: 'center', // Sonraki eşleşmeyi sayfa ortasına kaydırır
           });
         }
         return newIndex;
@@ -257,7 +251,7 @@ function App() {
         if (listRef.current) {
           listRef.current.scrollToIndex({
             index: searchResultsIndices[newIndex],
-            align: 'center', // Satırı ortalar
+            align: 'center', // Önceki eşleşmeyi sayfa ortasına kaydırır
           });
         }
         return newIndex;
@@ -487,7 +481,7 @@ function App() {
       border: '2px solid #e2e8f0',
       borderRadius: '8px',
       transition: 'all 0.3s ease',
-      autocomplete: 'off', // Disable browser autocomplete
+      autocomplete: 'off',
     },
     searchButton: {
       padding: '10px 25px',
