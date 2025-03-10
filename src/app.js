@@ -205,7 +205,10 @@ function App() {
         setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
         
         if (matchedIndices.length > 0 && listRef.current) {
-          listRef.current.scrollToIndex(matchedIndices[0]);
+          // Merkezi görünüme scroll yap
+          setTimeout(() => {
+            listRef.current.scrollToIndex(matchedIndices[0]);
+          }, 100);
         }
       }
     } catch (error) {
@@ -236,7 +239,10 @@ function App() {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev + 1) % searchResultsIndices.length;
         if (listRef.current) {
-          listRef.current.scrollToIndex(searchResultsIndices[newIndex]);
+          // Merkezi görünüme scroll yap
+          setTimeout(() => {
+            listRef.current.scrollToIndex(searchResultsIndices[newIndex]);
+          }, 50);
         }
         return newIndex;
       });
@@ -249,7 +255,10 @@ function App() {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev - 1 + searchResultsIndices.length) % searchResultsIndices.length;
         if (listRef.current) {
-          listRef.current.scrollToIndex(searchResultsIndices[newIndex]);
+          // Merkezi görünüme scroll yap
+          setTimeout(() => {
+            listRef.current.scrollToIndex(searchResultsIndices[newIndex]);
+          }, 50);
         }
         return newIndex;
       });
@@ -546,6 +555,21 @@ function App() {
       maxWidth: '1000px',
       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
     },
+    // Tarife ve eşya fihristi için özel merkezi görünüm container'ı
+    centeredListContainer: {
+      border: '1px solid #e2e8f0',
+      borderRadius: '8px',
+      overflow: 'hidden',
+      width: '100%',
+      margin: '0 auto',
+      maxWidth: '1000px',
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flex: 1,
+    },
     treeviewHeader: {
       display: 'flex',
       backgroundColor: '#2563eb',
@@ -554,6 +578,7 @@ function App() {
       fontSize: '14px',
       padding: '10px 15px',
       textAlign: 'left',
+      width: '100%',
     },
     headerCell: {
       padding: '0 10px',
@@ -763,7 +788,11 @@ function App() {
             </button>
           </div>
         ) : (
-          <div style={styles.results}>
+          <div style={{
+            ...styles.results,
+            // Tarife ve eşya fihristi sekmeleri için ek yükseklik ve dikey ortalama
+            ...(activeTab === 'tarife' || activeTab === 'esya-fihristi' ? { minHeight: '500px', display: 'flex', alignItems: 'center' } : {})
+          }}>
             {activeTab === 'gtip' && results.length > 0 && (
               <div style={styles.listContainer}>
                 <div style={styles.treeviewHeader}>
@@ -798,14 +827,14 @@ function App() {
             )}
 
             {activeTab === 'tarife' && results.length > 0 && (
-              <div style={{ ...styles.listContainer, margin: '0 auto' }}>
+              <div style={styles.centeredListContainer}>
                 <div style={styles.treeviewHeader}>
                   <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>1. Kolon</div>
                   <div style={{ ...styles.headerCell, ...styles.headerCellDescription }}>2. Kolon</div>
                 </div>
                 <VirtualList
                   items={results}
-                  height={350}
+                  height={400} // Yüksekliği arttırdım
                   rowHeight={40}
                   rowRenderer={rowRenderer}
                   ref={listRef}
@@ -814,7 +843,7 @@ function App() {
             )}
 
             {activeTab === 'esya-fihristi' && results.length > 0 && (
-              <div style={{ ...styles.listContainer, margin: '0 auto' }}>
+              <div style={styles.centeredListContainer}>
                 <div style={styles.treeviewHeader}>
                   <div style={{ ...styles.headerCell, ...styles.headerCellItem }}>Eşya</div>
                   <div style={{ ...styles.headerCell, ...styles.headerCellHarmonized }}>Armonize Sistem</div>
@@ -822,7 +851,7 @@ function App() {
                 </div>
                 <VirtualList
                   items={results}
-                  height={350}
+                  height={400} // Yüksekliği arttırdım
                   rowHeight={40}
                   rowRenderer={rowRenderer}
                   ref={listRef}
