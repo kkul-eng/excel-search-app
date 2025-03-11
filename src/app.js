@@ -5,13 +5,14 @@ function App() {
   const [activeTab, setActiveTab] = useState('gtip');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
-  const [gtipResults, setGtipResults] = useState([]); // GTİP sonuçlarını ayrı sakla
+  const [gtipResults, setGtipResults] = useState([]);
   const [searchResultsIndices, setSearchResultsIndices] = useState([]);
   const [detailResults, setDetailResults] = useState([]);
   const [showDetail, setShowDetail] = useState(false);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
   const [isLoading, setIsLoading] = useState(false);
   const [totalMatches, setTotalMatches] = useState(0);
+  const [error, setError] = useState(null);
   const searchInputRef = useRef(null);
   const listRef = useRef(null);
 
@@ -33,43 +34,50 @@ function App() {
   const tabs = useMemo(() => [
     { id: 'gtip', name: 'GTİP Arama', label: 'Aradığınız GTİP kodu veya kelimeleri girin:' },
     { id: 'izahname', name: 'İzahname Arama', label: 'Aranacak kelime veya kelimeleri girin:' },
-    { id: 'tarife', name: 'Tarife Cetveli', label: 'Aranacak kelime veya rakamı(izahnamedeki gibi) girin:' },
+    { id: 'tarife', name: 'Tarife Cetveli', label: 'Aranacak kelime veya rakamı girin:' },
     { id: 'esya-fihristi', name: 'Eşya Fihristi', label: 'Aranacak kelime veya rakamı girin:' },
   ], []);
 
   const activeTabData = useMemo(() => tabs.find((tab) => tab.id === activeTab), [tabs, activeTab]);
+  
   // İlk veriler yüklendiğinde
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         if (activeTab === 'gtip') {
-          // GTİP sekmesinde, kayıtlı sonuçları kullan
           setResults(gtipResults);
         } else if (activeTab === 'tarife') {
           setIsLoading(true);
+          setError(null);
           const response = await fetch('/api/tarife/all');
+          
+          if (!response.ok) {
+            throw new Error(`Tarife verileri alınamadı: ${response.status}`);
+          }
+          
           const data = await response.json();
           setResults(data || []);
-          setSearchResultsIndices([]);
-          setCurrentMatchIndex(-1);
-          setTotalMatches(0);
         } else if (activeTab === 'esya-fihristi') {
           setIsLoading(true);
+          setError(null);
           const response = await fetch('/api/esya-fihristi/all');
+          
+          if (!response.ok) {
+            throw new Error(`Eşya fihristi verileri alınamadı: ${response.status}`);
+          }
+          
           const data = await response.json();
           setResults(data || []);
-          setSearchResultsIndices([]);
-          setCurrentMatchIndex(-1);
-          setTotalMatches(0);
         } else {
-          // İzahname için
           setResults([]);
-          setSearchResultsIndices([]);
-          setCurrentMatchIndex(-1);
-          setTotalMatches(0);
         }
+        
+        setSearchResultsIndices([]);
+        setCurrentMatchIndex(-1);
+        setTotalMatches(0);
       } catch (error) {
         console.error('Veri yükleme hatası:', error);
+        setError(`Veri yüklenirken bir hata oluştu: ${error.message}`);
         setResults([]);
       } finally {
         setIsLoading(false);
@@ -79,7 +87,7 @@ function App() {
     loadInitialData();
 
     const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.key === 'f') {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         searchInputRef.current?.focus();
       }
@@ -103,9 +111,7 @@ function App() {
     const styleElement = document.createElement('style');
     styleElement.textContent = `
       @keyframes spin {
-        to {
-          transform: translate(-50%, -50%) rotate(360deg);
-        }
+        to { transform: translate(-50%, -50%) rotate(360deg); }
       }
 
       body {
@@ -115,20 +121,14 @@ function App() {
         line-height: 1.6;
         margin: 0;
         padding: 0;
-        overflow-y: hidden;
+        height: 100vh;
       }
 
-      * {
-        box-sizing: border-box;
-      }
+      * { box-sizing: border-box; }
       
-      body.is-loading {
-        overflow: hidden;
-      }
+      body.is-loading { overflow: hidden; }
       
-      .custom-scrollbar::-webkit-scrollbar {
-        width: 12px;
-      }
+      .custom-scrollbar::-webkit-scrollbar { width: 12px; }
       
       .custom-scrollbar::-webkit-scrollbar-track {
         background: #e2e8f0;
@@ -147,25 +147,35 @@ function App() {
       document.head.removeChild(styleElement);
     };
   }, []);
+
   // Arama fonksiyonu
   const search = useCallback(async () => {
-    if (!query.trim()) {
-      return;
-    }
+    if (!query.trim()) return;
 
     try {
       setIsLoading(true);
+      setError(null);
       
       if (activeTab === 'gtip') {
         const response = await fetch(`/api/gtip/search?query=${encodeURIComponent(query)}`);
+        
+        if (!response.ok) {
+          throw new Error(`GTİP araması başarısız: ${response.status}`);
+        }
+        
         const data = await response.json();
         setResults(data || []);
-        setGtipResults(data || []); // GTİP sonuçlarını sakla
+        setGtipResults(data || []);
         setSearchResultsIndices([]);
         setCurrentMatchIndex(-1);
         setShowDetail(false);
       } else if (activeTab === 'izahname') {
         const response = await fetch(`/api/izahname/search?query=${encodeURIComponent(query)}`);
+        
+        if (!response.ok) {
+          throw new Error(`İzahname araması başarısız: ${response.status}`);
+        }
+        
         const data = await response.json();
         setResults(data || []);
         setSearchResultsIndices([]);
@@ -173,8 +183,14 @@ function App() {
         setShowDetail(false);
       } else if (activeTab === 'tarife' || activeTab === 'esya-fihristi') {
         let allData = results;
+        
         if (allData.length === 0) {
           const allDataResponse = await fetch(`/api/${activeTab}/all`);
+          
+          if (!allDataResponse.ok) {
+            throw new Error(`${activeTab} verileri alınamadı: ${allDataResponse.status}`);
+          }
+          
           allData = await allDataResponse.json();
           setResults(allData || []);
         }
@@ -205,14 +221,17 @@ function App() {
         
         // Eşleşme varsa, ilk eşleşmeyi ekranın ortasına getir
         if (matchedIndices.length > 0 && listRef.current) {
-          listRef.current.scrollToIndex({
-            index: matchedIndices[0],
-            align: 'center'
-          });
+          setTimeout(() => {
+            listRef.current.scrollToIndex({
+              index: matchedIndices[0],
+              align: 'center'
+            });
+          }, 100);
         }
       }
     } catch (error) {
       console.error('Arama hatası:', error);
+      setError(`Arama sırasında bir hata oluştu: ${error.message}`);
       setResults([]);
       setSearchResultsIndices([]);
       setCurrentMatchIndex(-1);
@@ -226,22 +245,29 @@ function App() {
   const fetchDetail = useCallback(async (index) => {
     try {
       setIsLoading(true);
+      setError(null);
       const response = await fetch(`/api/izahname/context?index=${index}`);
+      
+      if (!response.ok) {
+        throw new Error(`İzahname detayı alınamadı: ${response.status}`);
+      }
+      
       const data = await response.json();
       setDetailResults(data || []);
       setShowDetail(true);
     } catch (error) {
       console.error('Detay alma hatası:', error);
+      setError(`Detay alınırken hata oluştu: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
   }, []);
+
   // Sonraki eşleşmeye git
   const nextMatch = useCallback(() => {
     if (searchResultsIndices.length > 0) {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev + 1) % searchResultsIndices.length;
-        // Sonraki eşleşmeyi ekranın ortasına getir
         if (listRef.current) {
           listRef.current.scrollToIndex({
             index: searchResultsIndices[newIndex],
@@ -258,7 +284,6 @@ function App() {
     if (searchResultsIndices.length > 0) {
       setCurrentMatchIndex((prev) => {
         const newIndex = (prev - 1 + searchResultsIndices.length) % searchResultsIndices.length;
-        // Önceki eşleşmeyi ekranın ortasına getir
         if (listRef.current) {
           listRef.current.scrollToIndex({
             index: searchResultsIndices[newIndex],
@@ -273,11 +298,14 @@ function App() {
   // Sekme değiştiğinde durumu sıfırla
   const resetState = useCallback((tabId) => {
     setActiveTab(tabId);
+    setQuery('');
+    setError(null);
     
     if (tabId === 'gtip') {
-      // GTİP sekmesine geçince önceki sonuçları göster
       setResults(gtipResults);
-    } 
+    } else {
+      setResults([]);
+    }
     
     setSearchResultsIndices([]);
     setShowDetail(false);
@@ -353,6 +381,7 @@ function App() {
         ...cellStyle,
         width: '25%',
       };
+
       if (activeTab === 'gtip') {
         return (
           <div key={key} style={{ ...baseRowStyle, ...dynamicStyle }}>
@@ -392,7 +421,8 @@ function App() {
       );
     }
   }, [activeTab, results, searchResultsIndices, currentMatchIndex]);
-// Güncellenmiş stiller
+
+  // Stiller
   const styles = {
     app: {
       height: '100vh',
@@ -405,10 +435,10 @@ function App() {
       backgroundColor: '#fff',
       color: '#1e293b',
       padding: '10px 15px',
-      height: '50px',
       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
       display: 'flex',
       alignItems: 'center',
+      zIndex: 50,
     },
     headerTitle: {
       fontSize: '22px',
@@ -423,11 +453,11 @@ function App() {
       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
       position: 'sticky',
       top: 0,
-      zIndex: 100,
+      zIndex: 40,
       padding: 0,
     },
     tab: {
-      padding: '8px 16px',
+      padding: '12px 20px',
       backgroundColor: 'transparent',
       color: '#64748b',
       border: 'none',
@@ -602,6 +632,7 @@ function App() {
       border: '1px solid #e2e8f0',
       borderRadius: '8px',
       transition: 'all 0.3s ease',
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
     },
     izahnameDetailContainer: {
       maxHeight: '500px',
@@ -617,11 +648,12 @@ function App() {
       color: 'white',
       border: 'none',
       padding: '8px 15px',
-      borderRadius: '4px',
+      borderRadius: '6px',
       cursor: 'pointer',
       fontSize: '14px',
       transition: 'all 0.3s ease',
       marginTop: '10px',
+      fontWeight: '500',
     },
     backButton: {
       display: 'flex',
@@ -631,20 +663,21 @@ function App() {
       color: '#1e293b',
       border: 'none',
       padding: '10px 15px',
-      borderRadius: '4px',
+      borderRadius: '6px',
       cursor: 'pointer',
       fontSize: '14px',
       transition: 'all 0.3s ease',
+      fontWeight: '500',
     },
     footer: {
       backgroundColor: '#2563eb',
       color: 'white',
       textAlign: 'center',
       padding: '10px 15px',
-      height: '40px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
+      fontSize: '14px',
     },
     loader: {
       position: 'fixed',
@@ -671,8 +704,24 @@ function App() {
       borderRadius: '4px',
       margin: '15px 0',
     },
+    errorMessage: {
+      backgroundColor: '#fee2e2',
+      color: '#b91c1c',
+      padding: '10px 15px',
+      borderRadius: '6px',
+      marginBottom: '15px',
+      fontSize: '14px',
+      fontWeight: '500',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+    },
+    errorIcon: {
+      fontSize: '20px',
+    },
   };
-return (
+
+  return (
     <div style={styles.app}>
       <header style={styles.header}>
         <h1 style={styles.headerTitle}>Gümrük Tarife Arama Uygulaması</h1>
@@ -695,6 +744,14 @@ return (
 
       <main style={styles.content} className="custom-scrollbar">
         <h2 style={styles.heading}>{activeTabData.name}</h2>
+        
+        {error && (
+          <div style={styles.errorMessage}>
+            <span style={styles.errorIcon}>⚠️</span>
+            {error}
+          </div>
+        )}
+        
         <div style={styles.searchContainer}>
           <label style={styles.label} htmlFor="search-input">{activeTabData.label}</label>
           <div style={styles.searchForm}>
@@ -707,7 +764,7 @@ return (
                 }}
                 disabled={searchResultsIndices.length <= 1}
                 title="Önceki eşleşme"
-   aria-label="Önceki eşleşme"
+                aria-label="Önceki eşleşme"
               >
                 ◄
               </button>
@@ -757,22 +814,21 @@ return (
         </div>
 
         {activeTab === 'gtip' && results.length === 0 && !isLoading && (
-          <div style={{ ...styles.emptyState, paddingBottom: 0 }}>
-            <p>  Bu sayfada;</p>
+          <div style={styles.emptyState}>
+            <p>Bu sayfada;</p>
             <p>- 3824 veya 382410 şeklinde GTİP kodu ile aralarda noktalama işareti olmadan arama,</p>
-            <p>- dokunmuş boyalı poliester pamuk devamsız mensucat şeklinde aramak yerine,</p>
-            <p>  yazım sırası önemli olmadan; do bo pa po de me şeklinde arama,</p>
-            <p>- sülfirik veya sülfirik asit şeklinde arama,</p>
-            <p>  yapabilirsiniz.</p>
+            <p>- dokunmuş boyalı poliester pamuk devamsız mensucat şeklinde aramak yerine,
+               yazım sırası önemli olmadan; do bo pa po de me şeklinde arama,</p>
+            <p>- sülfirik veya sülfirik asit şeklinde arama yapabilirsiniz.</p>
           </div>
         )}
 
-        {activeTab === 'izahname' && results.length === 0 && !isLoading && !showDetail && (
-          <div style={{ ...styles.emptyState, paddingBottom: 0 }}>
-            <p>  Bu sayfada;</p>
+{activeTab === 'izahname' && results.length === 0 && !isLoading && !showDetail && (
+          <div style={styles.emptyState}>
+            <p>Bu sayfada;</p>
             <p>- izahnamede aramak istediğiniz kelime veya kelimelerle arama,</p>
             <p>- herhangi bir fasıl için arama yapmak istediğinizde 59.03 gibi arama,</p>
-            <p>  yapabilirsiniz.</p>
+            <p>yapabilirsiniz.</p>
           </div>
         )}
 
