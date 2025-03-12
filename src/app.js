@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import VirtualList from './VirtualList';
 
 function App() {
+  // Main state variables
   const [activeTab, setActiveTab] = useState('gtip');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -13,24 +14,438 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [totalMatches, setTotalMatches] = useState(0);
   const [error, setError] = useState(null);
+
+  // Refs
   const searchInputRef = useRef(null);
   const listRef = useRef(null);
   const boldParagraphRef = useRef(null);
   const detailContainerRef = useRef(null);
 
-  // Stillerin tamamı tek bir nesnede
+  // Türkçe karakter dönüşümü
+  const turkceLower = useCallback((text) => {
+    if (!text) return '';
+    const turkceKarakterler = {
+      'İ': 'i', 'I': 'ı', 'Ş': 'ş', 'Ğ': 'ğ',
+      'Ü': 'ü', 'Ö': 'ö', 'Ç': 'ç'
+    };
+    let result = String(text);
+    for (const [upper, lower] of Object.entries(turkceKarakterler)) {
+      result = result.replace(new RegExp(upper, 'g'), lower);
+    }
+    return result.toLowerCase();
+  }, []);
+// Tab verileri
+  const tabs = useMemo(() => [
+    { id: 'gtip', name: 'GTİP Arama', label: 'Aradığınız GTİP kodu veya kelimeleri girin:' },
+    { id: 'izahname', name: 'İzahname Arama', label: 'Aranacak kelime veya kelimeleri girin:' },
+    { id: 'tarife', name: 'Tarife Cetveli', label: 'Aranacak kelime veya rakamı girin:' },
+    { id: 'esya-fihristi', name: 'Eşya Fihristi', label: 'Aranacak kelime veya rakamı girin:' },
+  ], []);
+
+  const activeTabData = useMemo(() => tabs.find((tab) => tab.id === activeTab), [tabs, activeTab]);
+  
+  // Scroll to bold paragraph when detail results are shown
+  useEffect(() => {
+    if (showDetail && boldParagraphRef.current && detailContainerRef.current) {
+      setTimeout(() => {
+        const container = detailContainerRef.current;
+        const boldParagraph = boldParagraphRef.current;
+        
+        const containerHeight = container.clientHeight;
+        const boldParagraphHeight = boldParagraph.clientHeight;
+        const boldParagraphTop = boldParagraph.offsetTop;
+        
+        const scrollPosition = boldParagraphTop - (containerHeight / 2) + (boldParagraphHeight / 2);
+        
+        container.scrollTop = scrollPosition;
+      }, 200); // Increased timeout for better reliability
+    }
+  }, [showDetail, detailResults]);
+
+  // Load initial data when tab changes
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        setResults([]);
+        setSearchResultsIndices([]);
+        setCurrentMatchIndex(-1);
+        setTotalMatches(0);
+        setShowDetail(false);
+        
+        if (activeTab === 'gtip') {
+          // For GTIP tab, use cached results if available
+          if (gtipResults.length > 0) {
+            setResults(gtipResults);
+          }
+        } else if (activeTab === 'tarife') {
+          const response = await fetch('/api/tarife/all');
+          
+          if (!response.ok) {
+            throw new Error(`Tarife verileri alınamadı: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          setResults(data || []);
+        } else if (activeTab === 'esya-fihristi') {
+          const response = await fetch('/api/esya-fihristi/all');
+          
+          if (!response.ok) {
+            throw new Error(`Eşya fihristi verileri alınamadı: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          setResults(data || []);
+        }
+        // For izahname tab, we don't need to load all data initially
+      } catch (error) {
+        console.error('Veri yükleme hatası:', error);
+        setError(`Veri yüklenirken bir hata oluştu: ${error.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+  loadInitialData();
+
+    // Set up keyboard shortcut for search
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, gtipResults]);
+
+  // Handle loading state CSS class
+  useEffect(() => {
+    if (isLoading) {
+      document.body.classList.add('is-loading');
+    } else {
+      document.body.classList.remove('is-loading');
+    }
+  }, [isLoading]);
+
+  // Add global styles
+  useEffect(() => {
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+      @keyframes spin {
+        to { transform: translate(-50%, -50%) rotate(360deg); }
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        background-color: #f8fafc;
+        color: #1e293b;
+        line-height: 1.6;
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+      }
+
+      * { box-sizing: border-box; }
+      
+      body.is-loading { overflow: hidden; }
+      
+      .custom-scrollbar::-webkit-scrollbar { width: 12px; }
+      
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: #e2e8f0;
+        border-radius: 8px;
+      }
+      
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: #2563eb;
+        border-radius: 8px;
+        border: 3px solid #e2e8f0;
+      }
+    `;
+    document.head.appendChild(styleElement);
+    
+    return () => {
+      document.head.removeChild(styleElement);
+    };
+  }, []);
+// Search function
+  const search = useCallback(async () => {
+    if (!query.trim()) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      setShowDetail(false); // Always close detail view on new search
+      
+      if (activeTab === 'gtip') {
+        const response = await fetch(`/api/gtip/search?query=${encodeURIComponent(query)}`);
+        
+        if (!response.ok) {
+          throw new Error(`GTİP araması başarısız: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setResults(data || []);
+        setGtipResults(data || []);
+        setSearchResultsIndices([]);
+        setCurrentMatchIndex(-1);
+      } else if (activeTab === 'izahname') {
+        const response = await fetch(`/api/izahname/search?query=${encodeURIComponent(query)}`);
+        
+        if (!response.ok) {
+          throw new Error(`İzahname araması başarısız: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setResults(data || []);
+        setSearchResultsIndices([]);
+        setCurrentMatchIndex(-1);
+      } else if (activeTab === 'tarife' || activeTab === 'esya-fihristi') {
+        // These tabs already have data loaded, so we filter locally
+        const lowerQuery = turkceLower(query);
+        let matchedIndices = [];
+        
+        if (activeTab === 'tarife') {
+          matchedIndices = results.map((row, index) => {
+            if (!row) return -1;
+            const col1 = turkceLower(row['1. Kolon'] || '');
+            const col2 = turkceLower(row['2. Kolon'] || '');
+            return col1.includes(lowerQuery) || col2.includes(lowerQuery) ? index : -1;
+          }).filter(index => index !== -1);
+        } else { // esya-fihristi
+          matchedIndices = results.map((row, index) => {
+            if (!row) return -1;
+            const esya = turkceLower(row['Eşya'] || '');
+            const armonize = turkceLower(row['Armonize Sistem'] || '');
+            const notlar = turkceLower(row['İzahname Notları'] || '');
+            return esya.includes(lowerQuery) || armonize.includes(lowerQuery) || notlar.includes(lowerQuery) ? index : -1;
+          }).filter(index => index !== -1);
+        }
+        
+        setSearchResultsIndices(matchedIndices);
+        setTotalMatches(matchedIndices.length);
+        setCurrentMatchIndex(matchedIndices.length > 0 ? 0 : -1);
+        
+        // Scroll to first match if found
+        if (matchedIndices.length > 0 && listRef.current) {
+          setTimeout(() => {
+            listRef.current.scrollToIndex({
+              index: matchedIndices[0],
+              align: 'center'
+            });
+          }, 100);
+        }
+      }
+    } catch (error) {
+      console.error('Arama hatası:', error);
+      setError(`Arama sırasında bir hata oluştu: ${error.message}`);
+      setResults([]);
+      setSearchResultsIndices([]);
+      setCurrentMatchIndex(-1);
+      setTotalMatches(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeTab, query, results, turkceLower]);
+// İzahname detay verisi çekme
+  const fetchDetail = useCallback(async (index) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await fetch(`/api/izahname/context?index=${index}`);
+      
+      if (!response.ok) {
+        throw new Error(`İzahname detayı alınamadı: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data || data.length === 0) {
+        throw new Error('İzahname detayı boş döndü');
+      }
+      
+      setDetailResults(data);
+      setShowDetail(true);
+    } catch (error) {
+      console.error('Detay alma hatası:', error);
+      setError(`Detay alınırken hata oluştu: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Sonraki eşleşmeye git
+  const nextMatch = useCallback(() => {
+    if (searchResultsIndices.length > 0) {
+      setCurrentMatchIndex((prev) => {
+        const newIndex = (prev + 1) % searchResultsIndices.length;
+        if (listRef.current) {
+          listRef.current.scrollToIndex({
+            index: searchResultsIndices[newIndex],
+            align: 'center'
+          });
+        }
+        return newIndex;
+      });
+    }
+  }, [searchResultsIndices]);
+
+  // Önceki eşleşmeye git
+  const previousMatch = useCallback(() => {
+    if (searchResultsIndices.length > 0) {
+      setCurrentMatchIndex((prev) => {
+        const newIndex = (prev - 1 + searchResultsIndices.length) % searchResultsIndices.length;
+        if (listRef.current) {
+          listRef.current.scrollToIndex({
+            index: searchResultsIndices[newIndex],
+            align: 'center'
+          });
+        }
+        return newIndex;
+      });
+    }
+  }, [searchResultsIndices]);
+
+  // Reset state when tab changes
+  const resetState = useCallback((tabId) => {
+    setActiveTab(tabId);
+    setQuery('');
+    setError(null);
+    setResults([]);
+    setSearchResultsIndices([]);
+    setShowDetail(false);
+    setCurrentMatchIndex(-1);
+    setTotalMatches(0);
+    setDetailResults([]);
+  }, []);
+
+  // Handle Enter key press for search
+  const handleKeyPress = useCallback((e) => {
+    if (e.key === 'Enter') {
+      search();
+    }
+  }, [search]);
+// Render row for VirtualList
+  const rowRenderer = useCallback(({ index, key, style }) => {
+    try {
+      const row = results[index];
+      if (!row) return null;
+
+      const isHighlighted = searchResultsIndices[currentMatchIndex] === index;
+      const isMatch = searchResultsIndices.includes(index);
+      
+      const baseRowStyle = {
+        display: 'flex',
+        alignItems: 'center',
+        padding: '10px 15px',
+        borderBottom: '1px solid #e2e8f0',
+        fontSize: '14px',
+        color: '#1e293b',
+        transition: 'all 0.3s ease',
+        textAlign: 'left',
+        ...style,
+      };
+      
+      const dynamicStyle = isHighlighted 
+        ? { backgroundColor: '#3b82f6', color: 'white' } 
+        : isMatch 
+          ? { backgroundColor: '#dbeafe' } 
+          : {};
+
+      const cellStyle = {
+        padding: '0 10px',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      };
+
+      const cellCodeStyle = {
+        ...cellStyle,
+        width: '150px',
+        flexShrink: 0,
+        fontWeight: '500',
+      };
+
+      const cellDescriptionStyle = {
+        ...cellStyle,
+        flex: 1,
+        minWidth: '300px',
+      };
+
+      const cellItemStyle = {
+        ...cellStyle,
+        width: '50%',
+      };
+
+      const cellHarmonizedStyle = {
+        ...cellStyle,
+        width: '25%',
+      };
+
+      const cellNotesStyle = {
+        ...cellStyle,
+        width: '25%',
+      };
+
+      if (activeTab === 'gtip') {
+        return (
+          <div key={key} style={{ ...baseRowStyle, ...dynamicStyle }}>
+            <div style={cellCodeStyle}>{row.Kod || ''}</div>
+            <div style={cellDescriptionStyle}>{row.Tanım || ''}</div>
+          </div>
+        );
+      } else if (activeTab === 'tarife') {
+        return (
+          <div key={key} style={{ ...baseRowStyle, ...dynamicStyle }}>
+            <div style={cellCodeStyle}>{row['1. Kolon'] || ''}</div>
+            <div style={cellDescriptionStyle}>{row['2. Kolon'] || ''}</div>
+          </div>
+        );
+      } else if (activeTab === 'esya-fihristi') {
+        return (
+          <div key={key} style={{ ...baseRowStyle, ...dynamicStyle }}>
+            <div style={cellItemStyle}>{row['Eşya'] || ''}</div>
+            <div style={cellHarmonizedStyle}>{row['Armonize Sistem'] || ''}</div>
+            <div style={cellNotesStyle}>{row['İzahname Notları'] || ''}</div>
+          </div>
+        );
+      }
+      return null;
+    } catch (err) {
+      console.error('Satır render hatası:', err);
+      return (
+        <div key={key} style={{ 
+          ...style, 
+          display: 'flex',
+          padding: '10px 15px',
+          borderBottom: '1px solid #e2e8f0',
+          fontSize: '14px' 
+        }}>
+          <div style={{ padding: '0 10px' }}>Satır gösterilirken hata oluştu</div>
+        </div>
+      );
+    }
+  }, [activeTab, results, searchResultsIndices, currentMatchIndex]);
+// Styles
   const styles = {
     app: {
-      minHeight: '100vh',
+      height: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      backgroundColor: '#f1f5f9',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      overflow: 'hidden',
     },
     header: {
-      padding: '15px',
       backgroundColor: '#fff',
-      borderBottom: '1px solid #e2e8f0',
-      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+      color: '#1e293b',
+      padding: '10px 15px',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+      display: 'flex',
+      alignItems: 'center',
+      zIndex: 50,
     },
     headerTitle: {
       fontSize: '22px',
@@ -152,7 +567,7 @@ function App() {
       backgroundColor: '#e2e8f0',
       cursor: 'not-allowed',
     },
-    matchInfo: {
+  matchInfo: {
       fontSize: '14px',
       fontWeight: '500',
       textAlign: 'center',
@@ -172,7 +587,7 @@ function App() {
       alignItems: 'center',
       width: '100%',
       flex: 1,
-      justifyContent: 'center',
+      justifyContent: 'flex-start', // Changed from 'center' to 'flex-start' for better layout
     },
     listContainer: {
       border: '1px solid #e2e8f0',
@@ -235,6 +650,7 @@ function App() {
       marginBottom: '20px',
       lineHeight: '1.8',
       scrollBehavior: 'smooth',
+      width: '100%', // Ensure full width
     },
     detailHeaderContainer: {
       display: 'flex',
@@ -275,6 +691,14 @@ function App() {
       fontWeight: '500',
       marginLeft: '15px',
     },
+    boldText: {
+      fontWeight: '700',
+      backgroundColor: '#f0f9ff',
+      padding: '10px',
+      borderRadius: '4px',
+      margin: '15px 0',
+      scrollMarginTop: '200px',
+    },
     footer: {
       backgroundColor: '#2563eb',
       color: 'white',
@@ -303,14 +727,6 @@ function App() {
       textAlign: 'left',
       color: '#64748b',
     },
-    boldText: {
-      fontWeight: '700',
-      backgroundColor: '#f0f9ff',
-      padding: '10px',
-      borderRadius: '4px',
-      margin: '15px 0',
-      scrollMarginTop: '200px',
-    },
     errorMessage: {
       backgroundColor: '#fee2e2',
       color: '#b91c1c',
@@ -326,92 +742,6 @@ function App() {
     errorIcon: {
       fontSize: '20px',
     },
-  };
-
-  useEffect(() => {
-    if (showDetail && boldParagraphRef.current && detailContainerRef.current) {
-      setTimeout(() => {
-        const container = detailContainerRef.current;
-        const boldParagraph = boldParagraphRef.current;
-        const containerHeight = container.clientHeight;
-        const boldParagraphHeight = boldParagraph.clientHeight;
-        const boldParagraphTop = boldParagraph.offsetTop;
-        const scrollPosition = boldParagraphTop - (containerHeight / 2) + (boldParagraphHeight / 2);
-        container.scrollTop = scrollPosition;
-      }, 100);
-    }
-  }, [showDetail, detailResults]);
-
-  const turkceLower = useCallback((text) => {
-    if (!text) return '';
-    const turkceKarakterler = {
-      'İ': 'i', 'I': 'ı', 'Ş': 'ş', 'Ğ': 'ğ',
-      'Ü': 'ü', 'Ö': 'ö', 'Ç': 'ç'
-    };
-    let result = String(text);
-    for (const [upper, lower] of Object.entries(turkceKarakterler)) {
-      result = result.replace(new RegExp(upper, 'g'), lower);
-    }
-    return result.toLowerCase();
-  }, []);
-
-  const tabs = useMemo(() => [
-    { id: 'gtip', name: 'GTİP Arama', label: 'Aradığınız GTİP kodu veya kelimeleri girin:' },
-    { id: 'izahname', name: 'İzahname Arama', label: 'Aranacak kelime veya kelimeleri girin:' },
-    { id: 'tarife', name: 'Tarife Cetveli', label: 'Aranacak kelime veya rakamı girin:' },
-    { id: 'esya-fihristi', name: 'Eşya Fihristi', label: 'Aranacak kelime veya rakamı girin:' },
-  ], []);
-
-  const activeTabData = useMemo(() => 
-    tabs.find((tab) => tab.id === activeTab), 
-    [tabs, activeTab]
-  );
-
-  // Eksik fonksiyonlar (bunları uygulamanıza göre implement etmeniz gerekiyor)
-  const resetState = (tabId) => {
-    setActiveTab(tabId);
-    setQuery('');
-    setResults([]);
-    setShowDetail(false);
-    // Diğer state'leri sıfırlamak için gerekli kodları ekleyin
-  };
-
-  const search = () => {
-    // Arama mantığını buraya ekleyin
-    console.log('Arama yapılıyor:', query);
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      search();
-    }
-  };
-
-  const previousMatch = () => {
-    // Önceki eşleşme navigasyon mantığı
-    console.log('Önceki eşleşmeye git');
-  };
-
-  const nextMatch = () => {
-    // Sonraki eşleşme navigasyon mantığı
-    console.log('Sonraki eşleşmeye git');
-  };
-
-  const fetchDetail = (index) => {
-    // Detay getirme mantığı
-    console.log('Detay getiriliyor:', index);
-    setShowDetail(true);
-  };
-
-  const rowRenderer = ({ index, style }) => {
-    // VirtualList için row renderer (örnek)
-    const item = results[index];
-    return (
-      <div style={style}>
-        {/* Item render mantığını buraya ekleyin */}
-        {item.code || item.paragraph || 'Item ' + index}
-      </div>
-    );
   };
 
   return (
