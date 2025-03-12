@@ -18,53 +18,21 @@ function App() {
   const boldParagraphRef = useRef(null);
   const detailContainerRef = useRef(null);
 
-  // Added useEffect to scroll to the bold paragraph when detail results are shown
-  useEffect(() => {
-    if (showDetail && boldParagraphRef.current && detailContainerRef.current) {
-      // Wait a bit for rendering to complete
-      setTimeout(() => {
-        // Get the container and bold paragraph positions
-        const container = detailContainerRef.current;
-        const boldParagraph = boldParagraphRef.current;
-        
-        // Calculate the scroll position to center the bold paragraph
-        const containerHeight = container.clientHeight;
-        const boldParagraphHeight = boldParagraph.clientHeight;
-        const boldParagraphTop = boldParagraph.offsetTop;
-        
-        // Calculate center position
-        const scrollPosition = boldParagraphTop - (containerHeight / 2) + (boldParagraphHeight / 2);
-        
-        // Scroll the container to center the bold paragraph
-        container.scrollTop = scrollPosition;
-      }, 100);
-    }
-  }, [showDetail, detailResults]);
-
-  // Türkçe karakter dönüşümü
-  const turkceLower = useCallback((text) => {
-    if (!text) return '';
-    const turkceKarakterler = {
-      'İ': 'i', 'I': 'ı', 'Ş': 'ş', 'Ğ': 'ğ',
-      'Ü': 'ü', 'Ö': 'ö', 'Ç': 'ç'
-    };
-    let result = String(text);
-    for (const [upper, lower] of Object.entries(turkceKarakterler)) {
-      result = result.replace(new RegExp(upper, 'g'), lower);
-    }
-    return result.toLowerCase();
-  }, []);
-
-  // Tab verileri
-  const tabs = useMemo(() => [
-    { id: 'gtip', name: 'GTİP Arama', label: 'Aradığınız GTİP kodu veya kelimeleri girin:' },
-    { id: 'izahname', name: 'İzahname Arama', label: 'Aranacak kelime veya kelimeleri girin:' },
-    { id: 'tarife', name: 'Tarife Cetveli', label: 'Aranacak kelime veya rakamı girin:' },
-    { id: 'esya-fihristi', name: 'Eşya Fihristi', label: 'Aranacak kelime veya rakamı girin:' },
-  ], []);
-
-  const activeTabData = useMemo(() => tabs.find((tab) => tab.id === activeTab), [tabs, activeTab]);
-  headerTitle: {
+  // Stillerin tamamı tek bir nesnede
+  const styles = {
+    app: {
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      backgroundColor: '#f1f5f9',
+    },
+    header: {
+      padding: '15px',
+      backgroundColor: '#fff',
+      borderBottom: '1px solid #e2e8f0',
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    },
+    headerTitle: {
       fontSize: '22px',
       fontWeight: '600',
       marginLeft: '10px',
@@ -195,7 +163,7 @@ function App() {
       borderRadius: '20px',
       display: 'inline-block',
     },
-        results: {
+    results: {
       padding: '15px',
       borderRadius: '8px',
       backgroundColor: '#fff',
@@ -258,7 +226,6 @@ function App() {
       transition: 'all 0.3s ease',
       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
     },
-    // Updated styles for izahname detail container
     izahnameDetailContainer: {
       maxHeight: '500px',
       overflowY: 'auto',
@@ -267,9 +234,8 @@ function App() {
       borderRadius: '8px',
       marginBottom: '20px',
       lineHeight: '1.8',
-      scrollBehavior: 'smooth', // Added for smooth scrolling
+      scrollBehavior: 'smooth',
     },
-    // New style for the detail header container
     detailHeaderContainer: {
       display: 'flex',
       alignItems: 'center',
@@ -277,7 +243,6 @@ function App() {
       width: '100%',
       marginBottom: '15px',
     },
-    // New style for the detail header title
     detailHeaderTitle: {
       fontSize: '18px',
       color: '#1e293b',
@@ -295,7 +260,6 @@ function App() {
       marginTop: '10px',
       fontWeight: '500',
     },
-    // Updated style for the back button
     backButton: {
       display: 'flex',
       alignItems: 'center',
@@ -309,9 +273,9 @@ function App() {
       fontSize: '14px',
       transition: 'all 0.3s ease',
       fontWeight: '500',
-      marginLeft: '15px', // Added to create spacing between title and button
+      marginLeft: '15px',
     },
-        footer: {
+    footer: {
       backgroundColor: '#2563eb',
       color: 'white',
       textAlign: 'center',
@@ -339,14 +303,13 @@ function App() {
       textAlign: 'left',
       color: '#64748b',
     },
-    // Updated style for bold text
     boldText: {
       fontWeight: '700',
       backgroundColor: '#f0f9ff',
       padding: '10px',
       borderRadius: '4px',
       margin: '15px 0',
-      scrollMarginTop: '200px', // Added to help center the element when scrolled to
+      scrollMarginTop: '200px',
     },
     errorMessage: {
       backgroundColor: '#fee2e2',
@@ -363,6 +326,92 @@ function App() {
     errorIcon: {
       fontSize: '20px',
     },
+  };
+
+  useEffect(() => {
+    if (showDetail && boldParagraphRef.current && detailContainerRef.current) {
+      setTimeout(() => {
+        const container = detailContainerRef.current;
+        const boldParagraph = boldParagraphRef.current;
+        const containerHeight = container.clientHeight;
+        const boldParagraphHeight = boldParagraph.clientHeight;
+        const boldParagraphTop = boldParagraph.offsetTop;
+        const scrollPosition = boldParagraphTop - (containerHeight / 2) + (boldParagraphHeight / 2);
+        container.scrollTop = scrollPosition;
+      }, 100);
+    }
+  }, [showDetail, detailResults]);
+
+  const turkceLower = useCallback((text) => {
+    if (!text) return '';
+    const turkceKarakterler = {
+      'İ': 'i', 'I': 'ı', 'Ş': 'ş', 'Ğ': 'ğ',
+      'Ü': 'ü', 'Ö': 'ö', 'Ç': 'ç'
+    };
+    let result = String(text);
+    for (const [upper, lower] of Object.entries(turkceKarakterler)) {
+      result = result.replace(new RegExp(upper, 'g'), lower);
+    }
+    return result.toLowerCase();
+  }, []);
+
+  const tabs = useMemo(() => [
+    { id: 'gtip', name: 'GTİP Arama', label: 'Aradığınız GTİP kodu veya kelimeleri girin:' },
+    { id: 'izahname', name: 'İzahname Arama', label: 'Aranacak kelime veya kelimeleri girin:' },
+    { id: 'tarife', name: 'Tarife Cetveli', label: 'Aranacak kelime veya rakamı girin:' },
+    { id: 'esya-fihristi', name: 'Eşya Fihristi', label: 'Aranacak kelime veya rakamı girin:' },
+  ], []);
+
+  const activeTabData = useMemo(() => 
+    tabs.find((tab) => tab.id === activeTab), 
+    [tabs, activeTab]
+  );
+
+  // Eksik fonksiyonlar (bunları uygulamanıza göre implement etmeniz gerekiyor)
+  const resetState = (tabId) => {
+    setActiveTab(tabId);
+    setQuery('');
+    setResults([]);
+    setShowDetail(false);
+    // Diğer state'leri sıfırlamak için gerekli kodları ekleyin
+  };
+
+  const search = () => {
+    // Arama mantığını buraya ekleyin
+    console.log('Arama yapılıyor:', query);
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      search();
+    }
+  };
+
+  const previousMatch = () => {
+    // Önceki eşleşme navigasyon mantığı
+    console.log('Önceki eşleşmeye git');
+  };
+
+  const nextMatch = () => {
+    // Sonraki eşleşme navigasyon mantığı
+    console.log('Sonraki eşleşmeye git');
+  };
+
+  const fetchDetail = (index) => {
+    // Detay getirme mantığı
+    console.log('Detay getiriliyor:', index);
+    setShowDetail(true);
+  };
+
+  const rowRenderer = ({ index, style }) => {
+    // VirtualList için row renderer (örnek)
+    const item = results[index];
+    return (
+      <div style={style}>
+        {/* Item render mantığını buraya ekleyin */}
+        {item.code || item.paragraph || 'Item ' + index}
+      </div>
+    );
   };
 
   return (
@@ -456,7 +505,8 @@ function App() {
             </div>
           )}
         </div>
-{activeTab === 'gtip' && results.length === 0 && !isLoading && (
+
+        {activeTab === 'gtip' && results.length === 0 && !isLoading && (
           <div style={styles.emptyState}>
             <p>Bu sayfada;</p>
             <p>- 3824 veya 382410 şeklinde GTİP kodu ile aralarda noktalama işareti olmadan arama,</p>
@@ -477,10 +527,8 @@ function App() {
 
         {isLoading && <div style={styles.loader} aria-label="Yükleniyor"></div>}
 
-        {/* Updated izahname detail section with the new layout */}
         {!isLoading && showDetail ? (
           <div style={styles.results}>
-            {/* New header with back button positioned to the right */}
             <div style={styles.detailHeaderContainer}>
               <h3 style={styles.detailHeaderTitle}>İzahname Detay</h3>
               <button 
@@ -492,7 +540,6 @@ function App() {
               </button>
             </div>
             
-            {/* Detail container with reference for scrolling */}
             <div 
               style={styles.izahnameDetailContainer} 
               className="custom-scrollbar"
@@ -543,7 +590,8 @@ function App() {
                 ))}
               </div>
             )}
-{activeTab === 'tarife' && results.length > 0 && (
+
+            {activeTab === 'tarife' && results.length > 0 && (
               <div style={{ ...styles.listContainer, margin: '0 auto' }}>
                 <div style={styles.treeviewHeader}>
                   <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>1. Kolon</div>
@@ -593,4 +641,3 @@ function App() {
 }
 
 export default App;
-  
