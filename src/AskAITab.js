@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { askAI } from './AIServices';
 
 /**
- * Yapay Zekaya Sor sekmesi bileşeni
+ * Yapay Zekaya Sor sekmesi bileşeni - optimize edilmiş
  */
 const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
   const [question, setQuestion] = useState('');
@@ -15,316 +15,240 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
   const [chatHistory, setChatHistory] = useState([]);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [cacheStatus, setCacheStatus] = useState('idle'); // Cache durumu: 'idle', 'hit', 'miss'
+  const [cacheStatus, setCacheStatus] = useState('idle');
   const questionInputRef = useRef(null);
   const chatContainerRef = useRef(null);
 
-  // Önbellek yönetimi - global değişkene tanımla
+  // Önbellek yapısı - global değişken yerine Redux benzeri pattern kullan
+  const cacheRef = useRef({
+    questions: {},
+    searchResults: {},
+    contexts: {},
+    MAX_CACHE_SIZE: 50
+  });
+
+  // LocalStorage'dan önbellek yükle 
   useEffect(() => {
-    if (!window.askAICache) {
-      window.askAICache = {
-        questions: {},
-        searchResults: {},
-        contexts: {},
-        MAX_CACHE_SIZE: 50,
-
-        checkSize() {
-          const questionKeys = Object.keys(this.questions);
-          if (questionKeys.length > this.MAX_CACHE_SIZE) {
-            const keysToRemove = questionKeys.slice(0, 10);
-            keysToRemove.forEach(key => {
-              delete this.questions[key];
-              delete this.searchResults[key];
-              delete this.contexts[key];
-            });
-            console.log('Cache temizlendi, 10 eski giriş silindi.');
-          }
-        },
-
-        addQuestion(question, answer, searchResults, context) {
-          const key = question.trim().toLowerCase();
-          this.questions[key] = answer;
-          this.searchResults[key] = searchResults;
-          this.contexts[key] = context;
-          this.checkSize();
-          
-          try {
-            localStorage.setItem('aiCache', JSON.stringify({
-              questions: this.questions,
-              searchResults: this.searchResults,
-              contexts: this.contexts
-            }));
-          } catch (e) {
-            console.warn('LocalStorage kayıt hatası:', e);
-          }
-        },
-
-        getAnswer(question) {
-          const key = question.trim().toLowerCase();
-          return {
-            answer: this.questions[key] || null,
-            searchResults: this.searchResults[key] || null,
-            context: this.contexts[key] || null
-          };
-        },
-
-        loadFromStorage() {
-          try {
-            const storedCache = localStorage.getItem('aiCache');
-            if (storedCache) {
-              const parsedCache = JSON.parse(storedCache);
-              this.questions = parsedCache.questions || {};
-              this.searchResults = parsedCache.searchResults || {};
-              this.contexts = parsedCache.contexts || {};
-              console.log('Cache localStorage\'dan yüklendi.');
-            }
-          } catch (e) {
-            console.warn('LocalStorage yükleme hatası:', e);
-          }
-        }
-      };
-      
-      window.askAICache.loadFromStorage();
+    try {
+      const storedCache = localStorage.getItem('aiCache');
+      if (storedCache) {
+        const parsedCache = JSON.parse(storedCache);
+        cacheRef.current = {
+          ...cacheRef.current,
+          questions: parsedCache.questions || {},
+          searchResults: parsedCache.searchResults || {},
+          contexts: parsedCache.contexts || {}
+        };
+        console.log('Cache localStorage\'dan yüklendi.');
+      }
+    } catch (e) {
+      console.warn('LocalStorage yükleme hatası:', e);
     }
   }, []);
 
-  // Soru kelimelerini ayıklama ve arama için anahtar kelimeler çıkarma
+  // Önbellekten cevap alma
+  const getCachedAnswer = useCallback((q) => {
+    const key = q.trim().toLowerCase();
+    return {
+      answer: cacheRef.current.questions[key] || null,
+      searchResults: cacheRef.current.searchResults[key] || null,
+      context: cacheRef.current.contexts[key] || null
+    };
+  }, []);
+
+  // Önbelleğe soru kaydetme
+  const cacheQuestion = useCallback((q, answer, results, context) => {
+    const key = q.trim().toLowerCase();
+    
+    // Önbelleğe kaydet
+    cacheRef.current.questions[key] = answer;
+    cacheRef.current.searchResults[key] = results;
+    cacheRef.current.contexts[key] = context;
+    
+    // Önbellek boyutunu kontrol et
+    const questionKeys = Object.keys(cacheRef.current.questions);
+    if (questionKeys.length > cacheRef.current.MAX_CACHE_SIZE) {
+      // En eski 10 girişi sil
+      const keysToRemove = questionKeys.slice(0, 10);
+      keysToRemove.forEach(k => {
+        delete cacheRef.current.questions[k];
+        delete cacheRef.current.searchResults[k];
+        delete cacheRef.current.contexts[k];
+      });
+    }
+    
+    // LocalStorage'a async olarak kaydet - ana thread'i bloklamasın
+    setTimeout(() => {
+      try {
+        localStorage.setItem('aiCache', JSON.stringify({
+          questions: cacheRef.current.questions,
+          searchResults: cacheRef.current.searchResults,
+          contexts: cacheRef.current.contexts
+        }));
+      } catch (e) {
+        console.warn('LocalStorage kayıt hatası:', e);
+      }
+    }, 0);
+  }, []);
+
+  // Soru kelimelerini ayıklama - optimize edilmiş
   const extractKeywords = useCallback((text) => {
     // Türkçe soru kelimeleri ve bağlaçlar
-    const filterWords = [
+    const filterWords = new Set([
       'ne', 'nasıl', 'neden', 'niçin', 'niye', 'kim', 'kime', 'kimi', 'kiminle', 'kimden',
       'nerede', 'nereye', 'nereden', 'neresi', 'hangisi', 'hangi', 'kaç', 'kaçta', 'ne zaman',
       'mi', 'mı', 'mu', 'mü', 'değil mi', 'değil mı', 'değil mu', 'değil mü',
       'mıdır', 'midir', 'mudur', 'müdür', 'acaba', 'hiç',
       've', 'veya', 'ile', 'de', 'da', 'ki', 'için', 'gibi', 'ise', 'ama', 'fakat',
       'sınıflandırılır', 'girer', 'olur', 'edilir', 'yapılır', 'bulunur', 'yer alır'
-    ];
+    ]);
     
-    // Boşlukları temizle, noktalama işaretlerini kaldır, küçük harfe çevir
-    const cleanText = text
-      .toLowerCase()
+    // Temizleme ve filtreleme işlemlerini birleştir
+    const keywords = new Set();
+    text.toLowerCase()
       .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '')
-      .replace(/\s\s+/g, ' ');
+      .replace(/\s\s+/g, ' ')
+      .split(' ')
+      .filter(word => !filterWords.has(word) && word.length > 2)
+      .forEach(word => keywords.add(word));
     
-    // Kelimelere ayır
-    const words = cleanText.split(' ');
-    
-    // Filtreleme kelimeleri ve 2 karakterden kısa kelimeleri çıkar
-    const keywords = words.filter(word => 
-      !filterWords.includes(word) && word.length > 2
-    );
-    
-    // Tekrar eden kelimeleri çıkar ve anlamlı bir arama seti oluştur
-    return [...new Set(keywords)];
+    return Array.from(keywords);
   }, []);
 
-  // GTİP araması
+  // GTİP araması - optimize edilmiş
   const searchGtip = useCallback(async (keywords, useCache = true) => {
-    try {
-      if (!keywords || keywords.length === 0) return [];
-      
-      // Tam metin arama sorgusu oluştur
-      const searchText = keywords.join(' ');
-      // Cache anahtar oluştur
-      const cacheKey = `gtip:${searchText}`;
-      
-      // Cache kontrolü
-      if (useCache) {
+    if (!keywords || keywords.length === 0) return [];
+    
+    // Tek sorgu yaklaşımıyla arama - birden fazla sorgu yapmak yerine
+    const searchText = keywords.join(' ');
+    const cacheKey = `gtip:${searchText}`;
+    
+    // Önbellek kontrolü
+    if (useCache) {
+      try {
         const cachedResults = sessionStorage.getItem(cacheKey);
         if (cachedResults) {
           return JSON.parse(cachedResults);
         }
+      } catch (e) {
+        console.warn('Session storage okuma hatası:', e);
+      }
+    }
+    
+    try {
+      // Tek bir API çağrısı yap
+      const response = await fetch(`/api/gtip/search?query=${encodeURIComponent(searchText)}`);
+      
+      if (!response.ok) {
+        throw new Error(`GTİP araması başarısız: ${response.status}`);
       }
       
-      // Sayısal sorgu için doğrudan kod araması yap
-      if (/^\d+$/.test(searchText)) {
-        const response = await fetch(`/api/gtip/search?query=${encodeURIComponent(searchText)}`);
-        
-        if (!response.ok) {
-          throw new Error(`GTİP araması başarısız: ${response.status}`);
+      const data = await response.json();
+      
+      // Veriyi önbelleğe asenkron kaydet
+      setTimeout(() => {
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(data || []));
+        } catch (e) {
+          console.warn('Session storage yazma hatası:', e);
         }
-        
-        const data = await response.json();
-        // Cache'e kaydet
-        sessionStorage.setItem(cacheKey, JSON.stringify(data || []));
-        return data || [];
-      } 
-      else {
-        // Tüm arama metnini tek bir sorgu olarak gönder
-        const response = await fetch(`/api/gtip/search?query=${encodeURIComponent(searchText)}`);
-        
-        if (!response.ok) {
-          throw new Error(`GTİP araması başarısız: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        // Cache'e kaydet
-        sessionStorage.setItem(cacheKey, JSON.stringify(data || []));
-        return data || [];
-      }
+      }, 0);
+      
+      return data || [];
     } catch (error) {
       console.error('GTİP arama hatası:', error);
       return [];
     }
   }, []);
-
-  // İzahname araması
-  const searchIzahname = useCallback(async (keywords, useCache = true) => {
-    try {
-      if (!keywords || keywords.length === 0) return { results: [], context: [] };
-      
-      // Cache anahtar oluştur
-      const cacheKey = `izahname:${keywords.sort().join(',')}`;
-      
-      // Cache kontrolü
-      if (useCache) {
-        const cachedResults = sessionStorage.getItem(cacheKey);
-        if (cachedResults) {
-          return JSON.parse(cachedResults);
-        }
-      }
-      
-      // Anahtar kelimelerle arama yap (her kelime için ayrı arama)
-      const results = [];
-      const promises = keywords.map(keyword => 
-        fetch(`/api/izahname/search?query=${encodeURIComponent(keyword)}`)
-          .then(response => {
-            if (!response.ok) {
-              throw new Error(`İzahname araması başarısız: ${response.status}`);
-            }
-            return response.json();
-          })
-          .then(data => {
-            if (data && data.length > 0) {
-              results.push(...data);
-            }
-          })
-      );
-      
-      await Promise.all(promises);
-      
-      // Tekrarlanan sonuçları çıkar
-      const uniqueResults = results.filter((item, index, self) =>
-        index === self.findIndex((t) => t.index === item.index)
-      );
-      
-      // En fazla 5 sonuç göster
-      const topResults = uniqueResults.slice(0, 5);
-      
-      // İlk sonuç için bağlam al (paragraf önce/sonra)
-      let context = [];
-      if (topResults.length > 0) {
-        const firstResult = topResults[0];
-        context = await fetchIzahnameContext(firstResult.index, useCache);
-      }
-      
-      const finalResults = { results: topResults, context };
-      
-      // Cache'e kaydet
-      sessionStorage.setItem(cacheKey, JSON.stringify(finalResults));
-      
-      return finalResults;
-    } catch (error) {
-      console.error('İzahname arama hatası:', error);
-      return { results: [], context: [] };
-    }
-  }, []);
-
-  // İzahname bağlam alma
-  const fetchIzahnameContext = useCallback(async (index, useCache = true) => {
-    try {
-      // Cache anahtar oluştur
-      const cacheKey = `izahname-context:${index}`;
-      
-      // Cache kontrolü
-      if (useCache) {
-        const cachedContext = sessionStorage.getItem(cacheKey);
-        if (cachedContext) {
-          return JSON.parse(cachedContext);
-        }
-      }
-      
-      const response = await fetch(`/api/izahname/context?index=${index}`);
-      
-      if (!response.ok) {
-        throw new Error(`İzahname detayı alınamadı: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      // Cache'e kaydet
-      sessionStorage.setItem(cacheKey, JSON.stringify(data || []));
-      
-      return data || [];
-    } catch (error) {
-      console.error('İzahname detay hatası:', error);
-      return [];
-    }
-  }, []);
-
-  // Sonuçlardan bağlam oluştur
+// Sonuçlardan bağlam oluştur
   const prepareContextFromResults = useCallback((gtipResults, izahnameResults, izahnameContext) => {
-    let context = '';
+    // Performans için string birleştirme işlemini optimize et
+    const contextParts = [];
     
-    // GTIP verileri - tablo formatında
     if (gtipResults && gtipResults.length > 0) {
-      context += "--- GTİP Verileri ---\n";
-      context += "Kod\tTanım\n";
-      context += "-------------------------------\n";
-      gtipResults.forEach(item => {
+      contextParts.push("--- GTİP Verileri ---");
+      contextParts.push("Kod\tTanım");
+      contextParts.push("-------------------------------");
+      
+      for (let i = 0; i < gtipResults.length; i++) {
+        const item = gtipResults[i];
         if (item.Kod && item.Tanım) {
-          context += `${item.Kod}\t${item.Tanım}\n`;
+          contextParts.push(`${item.Kod}\t${item.Tanım}`);
         }
-      });
-      context += "\n";
+      }
+      
+      contextParts.push("");
     }
     
-    // İzahname sonuçları
     if (izahnameResults && izahnameResults.length > 0) {
-      context += "--- İzahname Sonuçları ---\n";
-      izahnameResults.forEach(item => {
-        if (item.paragraph) {
-          context += `${item.paragraph}\n`;
+      contextParts.push("--- İzahname Sonuçları ---");
+      for (let i = 0; i < izahnameResults.length; i++) {
+        if (izahnameResults[i].paragraph) {
+          contextParts.push(izahnameResults[i].paragraph);
         }
-      });
-      context += "\n";
+      }
+      contextParts.push("");
     }
     
-    // İzahname bağlam
     if (izahnameContext && izahnameContext.length > 0) {
-      context += "--- İzahname Bağlam ---\n";
-      izahnameContext.forEach(item => {
-        if (item.paragraph) {
-          context += `${item.paragraph}\n`;
+      contextParts.push("--- İzahname Bağlam ---");
+      for (let i = 0; i < izahnameContext.length; i++) {
+        if (izahnameContext[i].paragraph) {
+          contextParts.push(izahnameContext[i].paragraph);
         }
-      });
-      context += "\n";
+      }
+      contextParts.push("");
     }
     
-    // Genel bağlam ekle
-    context += "\n--- Genel Bilgiler ---\n";
-    context += "GTİP (Gümrük Tarife İstatistik Pozisyonu) kodları, gümrük işlemlerinde kullanılan uluslararası kodlardır. ";
-    context += "Her ürünün kendine özgü bir GTİP kodu vardır ve bu kod ürünün gümrük işlemlerinde vergilendirme oranını belirler. ";
-    context += "Armonize Sistem Nomenklatürü, uluslararası ticarette ürünlerin sınıflandırılması için kullanılan standart bir sistemdir. ";
-    context += "İzahname, gümrük tarife pozisyonlarının detaylı açıklamalarını içerir. ";
-    context += "Eşya fihristi, alfabetik dizin şeklinde eşyaların hangi GTİP koduna girdiğini gösteren kılavuzdur.";
+    contextParts.push("");
+    contextParts.push("--- Genel Bilgiler ---");
+    contextParts.push("GTİP (Gümrük Tarife İstatistik Pozisyonu) kodları, gümrük işlemlerinde kullanılan uluslararası kodlardır. Her ürünün kendine özgü bir GTİP kodu vardır ve bu kod ürünün gümrük işlemlerinde vergilendirme oranını belirler. Armonize Sistem Nomenklatürü, uluslararası ticarette ürünlerin sınıflandırılması için kullanılan standart bir sistemdir. İzahname, gümrük tarife pozisyonlarının detaylı açıklamalarını içerir. Eşya fihristi, alfabetik dizin şeklinde eşyaların hangi GTİP koduna girdiğini gösteren kılavuzdur.");
     
-    return context;
+    return contextParts.join("\n");
   }, []);
 
-  // Sohbeti en aşağıya kaydırma
+  // Sohbeti en aşağıya kaydırma - debounce uygulanmış
   const scrollToBottom = useCallback(() => {
     if (chatContainerRef.current) {
       setTimeout(() => {
         chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-      }, 100);
+      }, 50);
     }
   }, []);
 
-  // Soru sorma fonksiyonu
+  // Direk GTİP sonucu göstermeyi işle
+  const handleGtipResults = useCallback((results, newChat) => {
+    if (!results || results.length === 0) return false;
+    
+    const currentSearchResults = {
+      gtipResults: results,
+      izahnameResults: [],
+      izahnameContext: []
+    };
+    
+    // Sonuçları göster
+    setSearchResults(currentSearchResults);
+    
+    // Python kodundaki gibi tablo formatında bir sonuç oluştur
+    const tableResponse = [
+      "GTİP sonuçları:",
+      "",
+      ...results.map(item => `Kod: ${item.Kod}, Tanım: ${item.Tanım}`)
+    ].join("\n");
+    
+    // Cevabı kullanıcıya göster
+    setChatHistory([...newChat, { type: 'answer', text: tableResponse }]);
+    
+    // Önbelleğe kaydet
+    cacheQuestion(question, tableResponse, currentSearchResults, "");
+    
+    return true;
+  }, [question, cacheQuestion]);
+
+  // Soru sorma fonksiyonu - optimize edilmiş
   const askQuestion = useCallback(async () => {
-    if (!question.trim()) return;
+    const trimmedQuestion = question.trim();
+    if (!trimmedQuestion) return;
     
     try {
       setIsLoading(true);
@@ -332,13 +256,13 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
       setError(null);
       
       // Cache'den kontrol et
-      const cachedData = window.askAICache?.getAnswer(question) || { answer: null };
+      const cachedData = getCachedAnswer(trimmedQuestion);
       if (cachedData.answer) {
         setCacheStatus('hit');
         console.log('Cache hit: Yanıt önbellekten alındı');
         
         // Soruyu geçmişe ekle
-        const newChat = [...chatHistory, { type: 'question', text: question }];
+        const newChat = [...chatHistory, { type: 'question', text: trimmedQuestion }];
         setChatHistory(newChat);
         
         // Cache'den sonuçları al
@@ -348,97 +272,68 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
           izahnameContext: []
         });
         
-        // Önbellekten cevabı geçmişe ekle
+        // Önbellekten cevabı geçmişe ekle - minimal gecikme
         setTimeout(() => {
           setChatHistory([...newChat, { type: 'answer', text: cachedData.answer }]);
           scrollToBottom();
           setIsLoading(false);
           setIsAsking(false);
-        }, 300);
+        }, 100);
         
         return;
       }
       
       setCacheStatus('miss');
-      console.log('Cache miss: Yanıt API\'den alınacak');
+      console.log('Cache miss: Yeni yanıt hazırlanıyor');
       
       // Soruyu geçmişe ekle
-      const newChat = [...chatHistory, { type: 'question', text: question }];
+      const newChat = [...chatHistory, { type: 'question', text: trimmedQuestion }];
       setChatHistory(newChat);
       
       // Anahtar kelimeleri çıkar
-      const keywords = extractKeywords(question);
+      const keywords = extractKeywords(trimmedQuestion);
       console.log('Anahtar kelimeler:', keywords);
       
-      // Önce GTİP araması yap ve sonuçları göster
+      // Önce GTİP araması yap
       const gtipResults = await searchGtip(keywords);
       
-      // GTİP sonuçları varsa, bunları direkt ekranda göster
-      if (gtipResults && gtipResults.length > 0) {
-        // Sonuçları kaydet
-        const currentSearchResults = {
-          gtipResults,
-          izahnameResults: [],
-          izahnameContext: []
-        };
-        
-        setSearchResults(currentSearchResults);
-        
-        // Python kodundaki gibi HTML tablo formatında bir sonuç oluştur
-        let tableResponse = "";
-        
-        if (gtipResults.length > 0) {
-          tableResponse = "GTİP sonuçları:\n\n";
-          gtipResults.forEach(item => {
-            tableResponse += `Kod: ${item.Kod}, Tanım: ${item.Tanım}\n`;
-          });
-        }
-        
-        // Cevabı kullanıcıya göster
-        setChatHistory([...newChat, { type: 'answer', text: tableResponse }]);
-        
-        // Cache'e kaydet
-        if (window.askAICache) {
-          window.askAICache.addQuestion(question, tableResponse, currentSearchResults, "");
-        }
-        
-        // Şimdilik işlemi sonlandır, daha fazla API çağrısı yapma
+      // GTİP sonuçları varsa, bunları direkt göster ve hızlıca dön
+      if (handleGtipResults(gtipResults, newChat)) {
         setIsLoading(false);
         setIsAsking(false);
         scrollToBottom();
         return;
       }
       
-      // GTİP sonucu yoksa normal akışa devam et
-      // İzahname araması ve diğer adımlar
-      const izahnameSearchResults = await searchIzahname(keywords);
-      const { results: izahnameResults, context: izahnameContext } = izahnameSearchResults;
-      
-      // Sonuçları kaydet
-      const currentSearchResults = {
-        gtipResults,
-        izahnameResults,
-        izahnameContext
-      };
-      
-      setSearchResults(currentSearchResults);
-      
-      // API için bağlamı hazırla
-      const context = prepareContextFromResults(gtipResults, izahnameResults, izahnameContext);
-      
-      // API'ye soruyu sor
-      const aiAnswer = await askAI(context, question);
-      
-      // Cevabı geçmişe ekle
-      setChatHistory([...newChat, { type: 'answer', text: aiAnswer }]);
-      
-      // Cache'e kaydet
-      if (window.askAICache) {
-        window.askAICache.addQuestion(question, aiAnswer, currentSearchResults, context);
+      // Asenkron işlemleri her zaman try-catch içinde yap
+      try {
+        // GTİP sonucu yoksa normal akışa devam et
+        const izahnameResults = [];
+        const izahnameContext = [];
+        
+        // Sonuçları kaydet
+        const currentSearchResults = { gtipResults, izahnameResults, izahnameContext };
+        setSearchResults(currentSearchResults);
+        
+        // API için bağlamı hazırla
+        const context = prepareContextFromResults(gtipResults, izahnameResults, izahnameContext);
+        
+        // API'ye soruyu sor
+        const aiAnswer = await askAI(context, trimmedQuestion);
+        
+        // Cevabı geçmişe ekle
+        setChatHistory([...newChat, { type: 'answer', text: aiAnswer }]);
+        
+        // Önbelleğe kaydet - asenkron
+        cacheQuestion(trimmedQuestion, aiAnswer, currentSearchResults, context);
+        
+        // Sohbet alanını en aşağıya kaydır
+        scrollToBottom();
+      } catch (innerError) {
+        console.error('İç işlem hatası:', innerError);
+        setError(`İşlem sırasında bir hata oluştu: ${innerError.message}`);
       }
       
-      // Sohbet alanını en aşağıya kaydır
-      scrollToBottom();
     } catch (err) {
       console.error('Yapay zeka soru hatası:', err);
       setError(`Soru sorulurken bir hata oluştu: ${err.message}`);
@@ -447,7 +342,7 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
       setIsAsking(false);
       setCacheStatus('idle');
     }
-  }, [question, chatHistory, extractKeywords, searchGtip, searchIzahname, prepareContextFromResults, scrollToBottom]);
+  }, [question, chatHistory, extractKeywords, searchGtip, prepareContextFromResults, scrollToBottom, getCachedAnswer, cacheQuestion, handleGtipResults]);
 
   // Enter tuşu ile soru sorma
   const handleKeyPress = useCallback((e) => {
@@ -475,10 +370,14 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
   // Örnek soru seçildiğinde
   const handleExampleClick = useCallback((exampleQuestion) => {
     setQuestion(exampleQuestion);
-    if (questionInputRef.current) {
-      questionInputRef.current.focus();
-    }
-  }, []);
+    // Gecikmeli olarak focus ve submit yap
+    setTimeout(() => {
+      if (questionInputRef.current) {
+        questionInputRef.current.focus();
+        askQuestion();
+      }
+    }, 100);
+  }, [askQuestion]);
 
   // Styles
   const styles = {
