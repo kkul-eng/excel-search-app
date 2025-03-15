@@ -2,7 +2,11 @@ const express = require('express');
 const path = require('path');
 const XLSX = require('xlsx');
 const fs = require('fs');
+const axios = require('axios'); // Axios ekleyin
 const app = express();
+
+// JSON request body parser
+app.use(express.json());
 
 // React build dosyalarını sun
 const buildPath = path.resolve(__dirname, 'build');
@@ -205,6 +209,58 @@ app.get('/api/izahname-text', (req, res) => {
   } catch (error) {
     console.error('İzahname.txt gönderme hatası:', error);
     res.status(500).json({ error: 'Veri gönderilirken hata oluştu: ' + error.message });
+  }
+});
+
+// Yapay Zeka API Proxy - API key'i korumak için
+app.post('/api/ask-ai', async (req, res) => {
+  try {
+    const prompt = req.body.prompt;
+    if (!prompt) {
+      return res.status(400).json({ error: 'Prompt eksik' });
+    }
+    
+    // Çevresel değişkenlerden API key'i al
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    if (!apiKey) {
+      console.error('API key bulunamadı. Lütfen .env dosyasında GEMINI_API_KEY değişkenini tanımlayın.');
+      return res.status(500).json({ 
+        error: 'API yapılandırması eksik',
+        message: '.env dosyasında GEMINI_API_KEY değişkenini tanımlayın veya aşağıdaki komut ile tanımlayın:',
+        example: 'export GEMINI_API_KEY="your-key-here"'
+      });
+    }
+    
+    // Gemini API'ye istek gönder
+    const geminiResponse = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        contents: [
+          {
+            parts: [
+              { text: prompt }
+            ]
+          }
+        ]
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    // API yanıtını işle
+    const answer = geminiResponse.data.candidates?.[0]?.content?.parts?.[0]?.text || "Cevap alınamadı.";
+    
+    res.json({ answer: answer });
+  } catch (error) {
+    console.error('AI API proxy hatası:', error.response?.data || error.message);
+    res.status(500).json({ 
+      error: 'Yapay zeka API hatası', 
+      message: error.response?.data?.error?.message || error.message 
+    });
   }
 });
 
