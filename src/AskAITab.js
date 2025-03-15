@@ -1,4 +1,175 @@
-// İzahname araması
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { askAI } from './AIServices';
+
+/**
+ * Yapay Zekaya Sor sekmesi bileşeni
+ */
+const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
+  const [question, setQuestion] = useState('');
+  const [searchResults, setSearchResults] = useState({
+    gtipResults: [],
+    izahnameResults: [],
+    izahnameContext: []
+  });
+  const [isAsking, setIsAsking] = useState(false);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [cacheStatus, setCacheStatus] = useState('idle'); // Cache durumu: 'idle', 'hit', 'miss'
+  const questionInputRef = useRef(null);
+  const chatContainerRef = useRef(null);
+
+  // Önbellek yönetimi - global değişkene tanımla
+  useEffect(() => {
+    if (!window.askAICache) {
+      window.askAICache = {
+        questions: {},
+        searchResults: {},
+        contexts: {},
+        MAX_CACHE_SIZE: 50,
+
+        checkSize() {
+          const questionKeys = Object.keys(this.questions);
+          if (questionKeys.length > this.MAX_CACHE_SIZE) {
+            const keysToRemove = questionKeys.slice(0, 10);
+            keysToRemove.forEach(key => {
+              delete this.questions[key];
+              delete this.searchResults[key];
+              delete this.contexts[key];
+            });
+            console.log('Cache temizlendi, 10 eski giriş silindi.');
+          }
+        },
+
+        addQuestion(question, answer, searchResults, context) {
+          const key = question.trim().toLowerCase();
+          this.questions[key] = answer;
+          this.searchResults[key] = searchResults;
+          this.contexts[key] = context;
+          this.checkSize();
+          
+          try {
+            localStorage.setItem('aiCache', JSON.stringify({
+              questions: this.questions,
+              searchResults: this.searchResults,
+              contexts: this.contexts
+            }));
+          } catch (e) {
+            console.warn('LocalStorage kayıt hatası:', e);
+          }
+        },
+
+        getAnswer(question) {
+          const key = question.trim().toLowerCase();
+          return {
+            answer: this.questions[key] || null,
+            searchResults: this.searchResults[key] || null,
+            context: this.contexts[key] || null
+          };
+        },
+
+        loadFromStorage() {
+          try {
+            const storedCache = localStorage.getItem('aiCache');
+            if (storedCache) {
+              const parsedCache = JSON.parse(storedCache);
+              this.questions = parsedCache.questions || {};
+              this.searchResults = parsedCache.searchResults || {};
+              this.contexts = parsedCache.contexts || {};
+              console.log('Cache localStorage\'dan yüklendi.');
+            }
+          } catch (e) {
+            console.warn('LocalStorage yükleme hatası:', e);
+          }
+        }
+      };
+      
+      window.askAICache.loadFromStorage();
+    }
+  }, []);
+
+  // Soru kelimelerini ayıklama ve arama için anahtar kelimeler çıkarma
+  const extractKeywords = useCallback((text) => {
+    // Türkçe soru kelimeleri ve bağlaçlar
+    const filterWords = [
+      'ne', 'nasıl', 'neden', 'niçin', 'niye', 'kim', 'kime', 'kimi', 'kiminle', 'kimden',
+      'nerede', 'nereye', 'nereden', 'neresi', 'hangisi', 'hangi', 'kaç', 'kaçta', 'ne zaman',
+      'mi', 'mı', 'mu', 'mü', 'değil mi', 'değil mı', 'değil mu', 'değil mü',
+      'mıdır', 'midir', 'mudur', 'müdür', 'acaba', 'hiç',
+      've', 'veya', 'ile', 'de', 'da', 'ki', 'için', 'gibi', 'ise', 'ama', 'fakat',
+      'sınıflandırılır', 'girer', 'olur', 'edilir', 'yapılır', 'bulunur', 'yer alır'
+    ];
+    
+    // Boşlukları temizle, noktalama işaretlerini kaldır, küçük harfe çevir
+    const cleanText = text
+      .toLowerCase()
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '')
+      .replace(/\s\s+/g, ' ');
+    
+    // Kelimelere ayır
+    const words = cleanText.split(' ');
+    
+    // Filtreleme kelimeleri ve 2 karakterden kısa kelimeleri çıkar
+    const keywords = words.filter(word => 
+      !filterWords.includes(word) && word.length > 2
+    );
+    
+    // Tekrar eden kelimeleri çıkar ve anlamlı bir arama seti oluştur
+    return [...new Set(keywords)];
+  }, []);
+
+  // GTİP araması
+  const searchGtip = useCallback(async (keywords, useCache = true) => {
+    try {
+      if (!keywords || keywords.length === 0) return [];
+      
+      // Tam metin arama sorgusu oluştur
+      const searchText = keywords.join(' ');
+      // Cache anahtar oluştur
+      const cacheKey = `gtip:${searchText}`;
+      
+      // Cache kontrolü
+      if (useCache) {
+        const cachedResults = sessionStorage.getItem(cacheKey);
+        if (cachedResults) {
+          return JSON.parse(cachedResults);
+        }
+      }
+      
+      // Sayısal sorgu için doğrudan kod araması yap
+      if (/^\d+$/.test(searchText)) {
+        const response = await fetch(`/api/gtip/search?query=${encodeURIComponent(searchText)}`);
+        
+        if (!response.ok) {
+          throw new Error(`GTİP araması başarısız: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        // Cache'e kaydet
+        sessionStorage.setItem(cacheKey, JSON.stringify(data || []));
+        return data || [];
+      } 
+      else {
+        // Tüm arama metnini tek bir sorgu olarak gönder
+        const response = await fetch(`/api/gtip/search?query=${encodeURIComponent(searchText)}`);
+        
+        if (!response.ok) {
+          throw new Error(`GTİP araması başarısız: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Cache'e kaydet
+        sessionStorage.setItem(cacheKey, JSON.stringify(data || []));
+        return data || [];
+      }
+    } catch (error) {
+      console.error('GTİP arama hatası:', error);
+      return [];
+    }
+  }, []);
+
+  // İzahname araması
   const searchIzahname = useCallback(async (keywords, useCache = true) => {
     try {
       if (!keywords || keywords.length === 0) return { results: [], context: [] };
