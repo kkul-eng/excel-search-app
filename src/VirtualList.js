@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 
+/**
+ * VirtualList - Büyük veri setlerini verimli şekilde render etmek için sanal liste komponenti
+ * 
+ * @param {Array} items - Gösterilecek öğeler dizisi
+ * @param {number} height - Listenin piksel cinsinden yüksekliği
+ * @param {number} rowHeight - Her satırın piksel cinsinden yüksekliği
+ * @param {function} rowRenderer - Satır render etme fonksiyonu ({ index, key, style }) => React.Node
+ */
 const VirtualList = forwardRef(({ items, height, rowHeight, rowRenderer }, ref) => {
   const containerRef = useRef(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [visibleItems, setVisibleItems] = useState([]);
-
-  // Calculate visible items when scrolling
+// Scroll pozisyonuna göre görünür öğeleri hesapla
   useEffect(() => {
     if (!items || !containerRef.current) return;
     
@@ -32,15 +39,14 @@ const VirtualList = forwardRef(({ items, height, rowHeight, rowRenderer }, ref) 
     
     setVisibleItems(visibleRows);
   }, [items, scrollTop, height, rowHeight]);
-
-  // Enhanced scrollToIndex to support alignment options
+// Gelişmiş scrollToIndex fonksiyonu - hizalama seçenekleriyle
   const scrollToIndex = (options) => {
     if (!containerRef.current) return;
     
     let index;
     let align = 'top';
     
-    // Support both direct index or options object with index and align
+    // Doğrudan index veya seçeneklerle obje desteği
     if (typeof options === 'object') {
       index = options.index;
       align = options.align || 'top';
@@ -50,11 +56,11 @@ const VirtualList = forwardRef(({ items, height, rowHeight, rowRenderer }, ref) 
     
     if (index < 0 || index >= (items?.length || 0)) return;
     
-    // Calculate scroll position based on alignment
+    // Hizalamaya göre kaydırma pozisyonunu hesapla
     let scrollPosition;
     switch (align) {
       case 'center':
-        // Center the row in the viewport
+        // Satırı viewport'un ortasına hizala
         scrollPosition = Math.max(
           0,
           index * rowHeight - (height - rowHeight) / 2
@@ -62,13 +68,13 @@ const VirtualList = forwardRef(({ items, height, rowHeight, rowRenderer }, ref) 
         break;
       case 'end':
       case 'bottom':
-        // Align to bottom
+        // Alta hizala
         scrollPosition = (index + 1) * rowHeight - height;
         break;
       case 'start':
       case 'top':
       default:
-        // Align to top (default behavior)
+        // Üste hizala (varsayılan davranış)
         scrollPosition = index * rowHeight;
         break;
     }
@@ -80,12 +86,11 @@ const VirtualList = forwardRef(({ items, height, rowHeight, rowRenderer }, ref) 
     setScrollTop(e.target.scrollTop);
   };
 
-  // Expose scrollToIndex to parent via ref
+  // scrollToIndex fonksiyonunu ebeveyn komponente ref üzerinden aç
   useImperativeHandle(ref, () => ({
     scrollToIndex,
   }), [items, height, rowHeight]);
-
-  return (
+return (
     <div
       ref={containerRef}
       style={{ 
