@@ -1,184 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { askAI } from './AIServices';
-
-// Önbellek yönetimi için cache yapısı
-const cache = {
-  questions: {},
-  searchResults: {},
-  contexts: {},
-  MAX_CACHE_SIZE: 50, // Maksimum cache girişi sayısı
-
-  // Cache boyutunu kontrol et ve gerekirse temizle
-  checkSize() {
-    const questionKeys = Object.keys(this.questions);
-    if (questionKeys.length > this.MAX_CACHE_SIZE) {
-      // En eski girişleri sil (ilk 10 tane)
-      const keysToRemove = questionKeys.slice(0, 10);
-      keysToRemove.forEach(key => {
-        delete this.questions[key];
-        delete this.searchResults[key];
-        delete this.contexts[key];
-      });
-      console.log('Cache temizlendi, 10 eski giriş silindi.');
-    }
-  },
-
-  // Soruyu cache'e ekle
-  addQuestion(question, answer, searchResults, context) {
-    // Benzersiz bir anahtar oluştur
-    const key = question.trim().toLowerCase();
-    
-    this.questions[key] = answer;
-    this.searchResults[key] = searchResults;
-    this.contexts[key] = context;
-    
-    this.checkSize();
-    
-    // Kalıcı depolama için localStorage'a kaydet
-    try {
-      localStorage.setItem('aiCache', JSON.stringify({
-        questions: this.questions,
-        searchResults: this.searchResults,
-        contexts: this.contexts
-      }));
-    } catch (e) {
-      console.warn('LocalStorage kayıt hatası:', e);
-    }
-  },
-
-  // Cache'den soru cevabını al
-  getAnswer(question) {
-    const key = question.trim().toLowerCase();
-    return {
-      answer: this.questions[key] || null,
-      searchResults: this.searchResults[key] || null,
-      context: this.contexts[key] || null
-    };
-  },
-
-  // Cache'i localStorage'dan yükle
-  loadFromStorage() {
-    try {
-      const storedCache = localStorage.getItem('aiCache');
-      if (storedCache) {
-        const parsedCache = JSON.parse(storedCache);
-        this.questions = parsedCache.questions || {};
-        this.searchResults = parsedCache.searchResults || {};
-        this.contexts = parsedCache.contexts || {};
-        console.log('Cache localStorage\'dan yüklendi.');
-      }
-    } catch (e) {
-      console.warn('LocalStorage yükleme hatası:', e);
-    }
-  }
-};
-
-/**
- * Yapay Zekaya Sor sekmesi bileşeni
- */
-const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
-  const [question, setQuestion] = useState('');
-  const [searchResults, setSearchResults] = useState({
-    gtipResults: [],
-    izahnameResults: [],
-    izahnameContext: []
-  });
-  const [isAsking, setIsAsking] = useState(false);
-  const [chatHistory, setChatHistory] = useState([]);
-  const [error, setError] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [cacheStatus, setCacheStatus] = useState('idle'); // Cache durumu: 'idle', 'hit', 'miss'
-  const questionInputRef = useRef(null);
-  const chatContainerRef = useRef(null);
-
-  // Cache'i başlangıçta yükle
-  useEffect(() => {
-    cache.loadFromStorage();
-  }, []);
-
-  // Soru kelimelerini ayıklama ve arama için anahtar kelimeler çıkarma
-  const extractKeywords = useCallback((text) => {
-    // Türkçe soru kelimeleri ve bağlaçlar
-    const filterWords = [
-      'ne', 'nasıl', 'neden', 'niçin', 'niye', 'kim', 'kime', 'kimi', 'kiminle', 'kimden',
-      'nerede', 'nereye', 'nereden', 'neresi', 'hangisi', 'hangi', 'kaç', 'kaçta', 'ne zaman',
-      'mi', 'mı', 'mu', 'mü', 'değil mi', 'değil mı', 'değil mu', 'değil mü',
-      'mıdır', 'midir', 'mudur', 'müdür', 'acaba', 'hiç',
-      've', 'veya', 'ile', 'de', 'da', 'ki', 'için', 'gibi', 'ise', 'ama', 'fakat',
-      'sınıflandırılır', 'girer', 'olur', 'edilir', 'yapılır', 'bulunur', 'yer alır'
-    ];
-    
-    // Boşlukları temizle, noktalama işaretlerini kaldır, küçük harfe çevir
-    const cleanText = text
-      .toLowerCase()
-      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '')
-      .replace(/\s\s+/g, ' ');
-    
-    // Kelimelere ayır
-    const words = cleanText.split(' ');
-    
-    // Filtreleme kelimeleri ve 2 karakterden kısa kelimeleri çıkar
-    const keywords = words.filter(word => 
-      !filterWords.includes(word) && word.length > 2
-    );
-    
-    // Tekrar eden kelimeleri çıkar ve anlamlı bir arama seti oluştur
-    return [...new Set(keywords)];
-  }, []);
-
-  // GTİP araması - Python koduna göre yeniden düzenlenmiş ve önbellekli
-  const searchGtip = useCallback(async (keywords, useCache = true) => {
-    try {
-      if (!keywords || keywords.length === 0) return [];
-      
-      // Tam metin arama sorgusu oluştur
-      const searchText = keywords.join(' ');
-      // Cache anahtar oluştur
-      const cacheKey = `gtip:${searchText}`;
-      
-      // Cache kontrolü
-      if (useCache) {
-        const cachedResults = sessionStorage.getItem(cacheKey);
-        if (cachedResults) {
-          return JSON.parse(cachedResults);
-        }
-      }
-      
-      // Sayısal sorgu için doğrudan kod araması yap
-      if (/^\d+$/.test(searchText)) {
-        const response = await fetch(`/api/gtip/search?query=${encodeURIComponent(searchText)}`);
-        
-        if (!response.ok) {
-          throw new Error(`GTİP araması başarısız: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        // Cache'e kaydet
-        sessionStorage.setItem(cacheKey, JSON.stringify(data || []));
-        return data || [];
-      } 
-      // Metin sorgusunda tüm kelimeleri içeren kayıtları bul (Python'daki all(keyword in x) mantığı)
-      else {
-        // Tüm arama metnini tek bir sorgu olarak gönder
-        const response = await fetch(`/api/gtip/search?query=${encodeURIComponent(searchText)}`);
-        
-        if (!response.ok) {
-          throw new Error(`GTİP araması başarısız: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        // Cache'e kaydet
-        sessionStorage.setItem(cacheKey, JSON.stringify(data || []));
-        return data || [];
-      }
-    } catch (error) {
-      console.error('GTİP arama hatası:', error);
-      return [];
-    }
-  }, []);
-
-  // İzahname araması - memoization ile iyileştirilmiş
+// İzahname araması - memoization ile iyileştirilmiş
   const searchIzahname = useCallback(async (keywords, useCache = true) => {
     try {
       if (!keywords || keywords.length === 0) return { results: [], context: [] };
@@ -272,6 +92,65 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
     }
   }, []);
 
+  // Sonuçlardan bağlam oluştur ve tablolaştır
+  const prepareContextFromResults = useCallback((gtipResults, izahnameResults, izahnameContext) => {
+    let context = '';
+    
+    // GTIP verileri - Python kodundaki gibi tablo formatında
+    if (gtipResults && gtipResults.length > 0) {
+      context += "--- GTİP Verileri ---\n";
+      context += "Kod\tTanım\n";
+      context += "-------------------------------\n";
+      gtipResults.forEach(item => {
+        if (item.Kod && item.Tanım) {
+          context += `${item.Kod}\t${item.Tanım}\n`;
+        }
+      });
+      context += "\n";
+    }
+    
+    // İzahname sonuçları
+    if (izahnameResults && izahnameResults.length > 0) {
+      context += "--- İzahname Sonuçları ---\n";
+      izahnameResults.forEach(item => {
+        if (item.paragraph) {
+          context += `${item.paragraph}\n`;
+        }
+      });
+      context += "\n";
+    }
+    
+    // İzahname bağlam
+    if (izahnameContext && izahnameContext.length > 0) {
+      context += "--- İzahname Bağlam ---\n";
+      izahnameContext.forEach(item => {
+        if (item.paragraph) {
+          context += `${item.paragraph}\n`;
+        }
+      });
+      context += "\n";
+    }
+    
+    // Genel bağlam ekle
+    context += "\n--- Genel Bilgiler ---\n";
+    context += "GTİP (Gümrük Tarife İstatistik Pozisyonu) kodları, gümrük işlemlerinde kullanılan uluslararası kodlardır. ";
+    context += "Her ürünün kendine özgü bir GTİP kodu vardır ve bu kod ürünün gümrük işlemlerinde vergilendirme oranını belirler. ";
+    context += "Armonize Sistem Nomenklatürü, uluslararası ticarette ürünlerin sınıflandırılması için kullanılan standart bir sistemdir. ";
+    context += "İzahname, gümrük tarife pozisyonlarının detaylı açıklamalarını içerir. ";
+    context += "Eşya fihristi, alfabetik dizin şeklinde eşyaların hangi GTİP koduna girdiğini gösteren kılavuzdur.";
+    
+    return context;
+  }, []);
+
+  // Sohbeti en aşağıya kaydırma
+  const scrollToBottom = useCallback(() => {
+    if (chatContainerRef.current) {
+      setTimeout(() => {
+        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      }, 100);
+    }
+  }, []);
+
   // Soru sorma fonksiyonu - cache ile iyileştirilmiş ve arama sonuçlarını tablo olarak gösterme
   const askQuestion = useCallback(async () => {
     if (!question.trim()) return;
@@ -282,7 +161,7 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
       setError(null);
       
       // Cache'den kontrol et
-      const cachedData = cache.getAnswer(question);
+      const cachedData = window.askAICache.getAnswer(question);
       if (cachedData.answer) {
         setCacheStatus('hit');
         console.log('Cache hit: Yanıt önbellekten alındı');
@@ -348,7 +227,7 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
         setChatHistory([...newChat, { type: 'answer', text: tableResponse }]);
         
         // Cache'e kaydet
-        cache.addQuestion(question, tableResponse, currentSearchResults, "");
+        window.askAICache.addQuestion(question, tableResponse, currentSearchResults, "");
         
         // Şimdilik işlemi sonlandır, daha fazla API çağrısı yapma
         setIsLoading(false);
@@ -381,7 +260,7 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
       setChatHistory([...newChat, { type: 'answer', text: aiAnswer }]);
       
       // Cache'e kaydet
-      cache.addQuestion(question, aiAnswer, currentSearchResults, context);
+      window.askAICache.addQuestion(question, aiAnswer, currentSearchResults, context);
       
       // Sohbet alanını en aşağıya kaydır
       scrollToBottom();
@@ -393,66 +272,7 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
       setIsAsking(false);
       setCacheStatus('idle');
     }
-  }, [question, chatHistory, extractKeywords, searchGtip, searchIzahname, prepareContextFromResults]);
-
-  // Sonuçlardan bağlam oluştur ve tablolaştır
-  const prepareContextFromResults = useCallback((gtipResults, izahnameResults, izahnameContext) => {
-    let context = '';
-    
-    // GTIP verileri - Python kodundaki gibi tablo formatında
-    if (gtipResults && gtipResults.length > 0) {
-      context += "--- GTİP Verileri ---\n";
-      context += "Kod\tTanım\n";
-      context += "-------------------------------\n";
-      gtipResults.forEach(item => {
-        if (item.Kod && item.Tanım) {
-          context += `${item.Kod}\t${item.Tanım}\n`;
-        }
-      });
-      context += "\n";
-    }
-    
-    // İzahname sonuçları
-    if (izahnameResults && izahnameResults.length > 0) {
-      context += "--- İzahname Sonuçları ---\n";
-      izahnameResults.forEach(item => {
-        if (item.paragraph) {
-          context += `${item.paragraph}\n`;
-        }
-      });
-      context += "\n";
-    }
-    
-    // İzahname bağlam
-    if (izahnameContext && izahnameContext.length > 0) {
-      context += "--- İzahname Bağlam ---\n";
-      izahnameContext.forEach(item => {
-        if (item.paragraph) {
-          context += `${item.paragraph}\n`;
-        }
-      });
-      context += "\n";
-    }
-    
-    // Genel bağlam ekle
-    context += "\n--- Genel Bilgiler ---\n";
-    context += "GTİP (Gümrük Tarife İstatistik Pozisyonu) kodları, gümrük işlemlerinde kullanılan uluslararası kodlardır. ";
-    context += "Her ürünün kendine özgü bir GTİP kodu vardır ve bu kod ürünün gümrük işlemlerinde vergilendirme oranını belirler. ";
-    context += "Armonize Sistem Nomenklatürü, uluslararası ticarette ürünlerin sınıflandırılması için kullanılan standart bir sistemdir. ";
-    context += "İzahname, gümrük tarife pozisyonlarının detaylı açıklamalarını içerir. ";
-    context += "Eşya fihristi, alfabetik dizin şeklinde eşyaların hangi GTİP koduna girdiğini gösteren kılavuzdur.";
-    
-    return context;
-  }, []);
-
-  // Sohbeti en aşağıya kaydırma
-  const scrollToBottom = useCallback(() => {
-    if (chatContainerRef.current) {
-      setTimeout(() => {
-        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-      }, 100);
-    }
-  }, []);
+  }, [question, chatHistory, extractKeywords, searchGtip, searchIzahname, prepareContextFromResults, scrollToBottom]);
 
   // Enter tuşu ile soru sorma
   const handleKeyPress = useCallback((e) => {
@@ -499,20 +319,6 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
       maxHeight: '200px',
       overflowY: 'auto',
     },
-    gtipItem: {
-      display: 'flex',
-      padding: '10px 15px',
-      borderBottom: '1px solid #e2e8f0',
-      fontSize: '14px',
-    },
-    gtipCode: {
-      width: '150px',
-      fontWeight: '500',
-      flexShrink: 0,
-    },
-    gtipDesc: {
-      flex: 1,
-    },
     aiAnswerContainer: {
       padding: '15px',
       backgroundColor: '#f0f9ff',
@@ -532,15 +338,6 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
       lineHeight: '1.6',
       whiteSpace: 'pre-wrap',
     },
-    cacheIndicator: {
-      marginLeft: 'auto',
-      fontSize: '12px',
-      padding: '2px 6px',
-      borderRadius: '4px',
-      backgroundColor: '#e0f2fe',
-      color: '#0369a1',
-      fontWeight: 'normal',
-    },
     chatHistoryContainer: {
       flex: 1,
       overflowY: 'auto',
@@ -549,7 +346,6 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
       gap: '15px',
       marginBottom: '15px',
       maxHeight: '400px',
-      ref: chatContainerRef,
     },
     userQuestion: {
       alignSelf: 'flex-end',
@@ -611,12 +407,6 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
       fontSize: '14px',
       fontWeight: '500',
     },
-    noResults: {
-      padding: '15px',
-      textAlign: 'center',
-      color: '#64748b',
-      fontStyle: 'italic',
-    },
     loadingSpinner: {
       display: 'inline-block',
       width: '16px',
@@ -626,19 +416,6 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
       borderRadius: '50%',
       animation: 'spin 1s linear infinite',
       marginRight: '8px',
-    },
-    keywordsContainer: {
-      display: 'flex',
-      gap: '5px',
-      flexWrap: 'wrap',
-      marginBottom: '10px',
-    },
-    keywordTag: {
-      padding: '2px 8px',
-      backgroundColor: '#e2e8f0',
-      borderRadius: '12px',
-      fontSize: '12px',
-      color: '#475569',
     },
     emptyState: {
       flex: 1,
@@ -678,25 +455,7 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
       borderRadius: '6px',
       cursor: 'pointer',
       transition: 'all 0.2s ease',
-      ':hover': {
-        backgroundColor: '#e2e8f0',
-      }
-    },
-    cacheBadge: {
-      marginLeft: '8px',
-      padding: '2px 6px',
-      borderRadius: '4px',
-      fontSize: '12px',
-      fontWeight: 'normal',
-    },
-    cacheHit: {
-      backgroundColor: '#dcfce7',
-      color: '#166534',
-    },
-    cacheMiss: {
-      backgroundColor: '#ffe4e6',
-      color: '#9f1239',
-    },
+    }
   };
 
   // Örnek sorular
