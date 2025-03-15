@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import VirtualList from './VirtualList';
+import AskAITab from './AskAITab'; // Yeni eklenen bileşen
 
 function App() {
   // Main state variables
@@ -14,6 +15,14 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [totalMatches, setTotalMatches] = useState(0);
   const [error, setError] = useState(null);
+  
+  // Tüm veriler için yeni state
+  const [combinedData, setCombinedData] = useState({
+    gtipData: [],
+    izahnameData: [],
+    tarifeData: [],
+    esyaFihristiData: []
+  });
 
   // Refs
   const searchInputRef = useRef(null);
@@ -34,12 +43,14 @@ function App() {
     }
     return result.toLowerCase();
   }, []);
-// Tab verileri
+
+  // Tab verileri
   const tabs = useMemo(() => [
     { id: 'gtip', name: 'GTİP Arama', label: 'Aradığınız GTİP kodu veya kelimeleri girin:' },
     { id: 'izahname', name: 'İzahname Arama', label: 'Aranacak kelime veya kelimeleri girin:' },
     { id: 'tarife', name: 'Tarife Cetveli', label: 'Aranacak kelime veya rakamı girin:' },
     { id: 'esya-fihristi', name: 'Eşya Fihristi', label: 'Aranacak kelime veya rakamı girin:' },
+    { id: 'ask-ai', name: 'Yapay Zekaya Sor', label: 'Sorunuzu yazın:' }, // Yeni sekme
   ], []);
 
   const activeTabData = useMemo(() => tabs.find((tab) => tab.id === activeTab), [tabs, activeTab]);
@@ -61,6 +72,55 @@ function App() {
       }, 200); // Increased timeout for better reliability
     }
   }, [showDetail, detailResults]);
+
+  // Tüm verileri yükleme fonksiyonu - Yapay Zeka için
+  const loadAllData = async () => {
+    if (activeTab === 'ask-ai') {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const newCombinedData = { ...combinedData };
+        
+        // GTIP verisi
+        if (newCombinedData.gtipData.length === 0) {
+          const response = await fetch('/api/gtip/search?query=');
+          if (response.ok) {
+            const data = await response.json();
+            newCombinedData.gtipData = data || [];
+          }
+        }
+        
+        // İzahname verisi - sadece yapısal olarak alabiliyoruz
+        // Gerçek veri aramalarla gelecek
+        
+        // Tarife verisi
+        if (newCombinedData.tarifeData.length === 0) {
+          const response = await fetch('/api/tarife/all');
+          if (response.ok) {
+            const data = await response.json();
+            newCombinedData.tarifeData = data || [];
+          }
+        }
+        
+        // Eşya Fihristi verisi
+        if (newCombinedData.esyaFihristiData.length === 0) {
+          const response = await fetch('/api/esya-fihristi/all');
+          if (response.ok) {
+            const data = await response.json();
+            newCombinedData.esyaFihristiData = data || [];
+          }
+        }
+        
+        setCombinedData(newCombinedData);
+      } catch (error) {
+        console.error('Veri yükleme hatası:', error);
+        setError(`Yapay zeka için veri yüklenirken bir hata oluştu: ${error.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
 
   // Load initial data when tab changes
   useEffect(() => {
@@ -88,6 +148,9 @@ function App() {
           
           const data = await response.json();
           setResults(data || []);
+          
+          // Aynı zamanda combinedData'ya da ekle
+          setCombinedData(prev => ({...prev, tarifeData: data || []}));
         } else if (activeTab === 'esya-fihristi') {
           const response = await fetch('/api/esya-fihristi/all');
           
@@ -97,6 +160,12 @@ function App() {
           
           const data = await response.json();
           setResults(data || []);
+          
+          // Aynı zamanda combinedData'ya da ekle
+          setCombinedData(prev => ({...prev, esyaFihristiData: data || []}));
+        } else if (activeTab === 'ask-ai') {
+          // Yapay zeka için tüm verileri yükle
+          await loadAllData();
         }
         // For izahname tab, we don't need to load all data initially
       } catch (error) {
@@ -106,7 +175,8 @@ function App() {
         setIsLoading(false);
       }
     };
-  loadInitialData();
+    
+    loadInitialData();
 
     // Set up keyboard shortcut for search
     const handleKeyDown = (e) => {
@@ -118,7 +188,7 @@ function App() {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, gtipResults]);
+  }, [activeTab, gtipResults, loadAllData]);
 
   // Handle loading state CSS class
   useEffect(() => {
@@ -189,6 +259,10 @@ function App() {
         const data = await response.json();
         setResults(data || []);
         setGtipResults(data || []);
+        
+        // Aynı zamanda combinedData'ya da ekle
+        setCombinedData(prev => ({...prev, gtipData: data || []}));
+        
         setSearchResultsIndices([]);
         setCurrentMatchIndex(-1);
       } else if (activeTab === 'izahname') {
@@ -200,6 +274,10 @@ function App() {
         
         const data = await response.json();
         setResults(data || []);
+        
+        // Aynı zamanda combinedData'ya da ekle
+        setCombinedData(prev => ({...prev, izahnameData: data || []}));
+        
         setSearchResultsIndices([]);
         setCurrentMatchIndex(-1);
       } else if (activeTab === 'tarife' || activeTab === 'esya-fihristi') {
@@ -249,7 +327,8 @@ function App() {
       setIsLoading(false);
     }
   }, [activeTab, query, results, turkceLower]);
-// İzahname detay verisi çekme
+
+  // İzahname detay verisi çekme
   const fetchDetail = useCallback(async (index) => {
     try {
       setIsLoading(true);
@@ -328,7 +407,8 @@ function App() {
       search();
     }
   }, [search]);
-// Render row for VirtualList
+
+  // Render row for VirtualList
   const rowRenderer = useCallback(({ index, key, style }) => {
     try {
       const row = results[index];
@@ -429,7 +509,8 @@ function App() {
       );
     }
   }, [activeTab, results, searchResultsIndices, currentMatchIndex]);
-// Styles
+
+  // Styles
   const styles = {
     app: {
       height: '100vh',
@@ -567,7 +648,7 @@ function App() {
       backgroundColor: '#e2e8f0',
       cursor: 'not-allowed',
     },
-  matchInfo: {
+    matchInfo: {
       fontSize: '14px',
       fontWeight: '500',
       textAlign: 'center',
@@ -743,8 +824,7 @@ function App() {
       fontSize: '20px',
     },
   };
-
-  return (
+return (
     <div style={styles.app}>
       <header style={styles.header}>
         <h1 style={styles.headerTitle}>Gümrük Tarife Arama Uygulaması</h1>
@@ -775,191 +855,201 @@ function App() {
           </div>
         )}
         
-        <div style={styles.searchContainer}>
-          <label style={styles.label} htmlFor="search-input">{activeTabData.label}</label>
-          <div style={styles.searchForm}>
-            {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 1 && (
-              <button
-                onClick={previousMatch}
-                style={{
-                  ...styles.navButton,
-                  ...(searchResultsIndices.length <= 1 ? styles.navButtonDisabled : {})
-                }}
-                disabled={searchResultsIndices.length <= 1}
-                title="Önceki eşleşme"
-                aria-label="Önceki eşleşme"
-              >
-                ◄
-              </button>
-            )}
-            <input
-              id="search-input"
-              ref={searchInputRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder={`${activeTabData.name} ...`}
-              aria-label="Arama"
-              style={styles.searchInput}
-              autoComplete="off" 
-            />
-            <button 
-              onClick={search} 
-              disabled={isLoading}
-              aria-label="Ara"
-              style={{
-                ...styles.searchButton,
-                ...(isLoading ? styles.searchButtonDisabled : {})
-              }}
-            >
-              {isLoading ? 'Aranıyor...' : 'Ara'}
-            </button>
-            {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 1 && (
-              <button
-                onClick={nextMatch}
-                style={{
-                  ...styles.navButton,
-                  ...(searchResultsIndices.length <= 1 ? styles.navButtonDisabled : {})
-                }}
-                disabled={searchResultsIndices.length <= 1}
-                title="Sonraki eşleşme"
-                aria-label="Sonraki eşleşme"
-              >
-                ►
-              </button>
-            )}
-          </div>
-          {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 0 && (
-            <div style={styles.matchInfo}>
-              {currentMatchIndex >= 0 ? currentMatchIndex + 1 : 0} / {totalMatches} eşleşme
-            </div>
-          )}
-        </div>
-
-        {activeTab === 'gtip' && results.length === 0 && !isLoading && (
-          <div style={styles.emptyState}>
-            <p>Bu sayfada;</p>
-            <p>- 3824 veya 382410 şeklinde GTİP kodu ile aralarda noktalama işareti olmadan arama,</p>
-            <p>- dokunmuş boyalı poliester pamuk devamsız mensucat şeklinde aramak yerine,
-               yazım sırası önemli olmadan; do bo pa po de me şeklinde arama,</p>
-            <p>- sülfirik veya sülfirik asit şeklinde arama yapabilirsiniz.</p>
-          </div>
-        )}
-
-        {activeTab === 'izahname' && results.length === 0 && !isLoading && !showDetail && (
-          <div style={styles.emptyState}>
-            <p>Bu sayfada;</p>
-            <p>- izahnamede aramak istediğiniz kelime veya kelimelerle arama,</p>
-            <p>- herhangi bir fasıl için arama yapmak istediğinizde 59.03 gibi arama,</p>
-            <p>yapabilirsiniz.</p>
-          </div>
-        )}
-
-        {isLoading && <div style={styles.loader} aria-label="Yükleniyor"></div>}
-
-        {!isLoading && showDetail ? (
-          <div style={styles.results}>
-            <div style={styles.detailHeaderContainer}>
-              <h3 style={styles.detailHeaderTitle}>İzahname Detay</h3>
-              <button 
-                onClick={() => setShowDetail(false)}
-                style={styles.backButton}
-                aria-label="Geri dön"
-              >
-                <span>←</span> Geri Dön
-              </button>
-            </div>
-            
-            <div 
-              style={styles.izahnameDetailContainer} 
-              className="custom-scrollbar"
-              ref={detailContainerRef}
-            >
-              {detailResults.map((result, index) => (
-                <p 
-                  key={index} 
-                  style={result.isBold ? styles.boldText : {}}
-                  ref={result.isBold ? boldParagraphRef : null}
-                >
-                  {result.paragraph || ''}
-                </p>
-              ))}
-            </div>
-          </div>
+        {/* Yapay Zeka sekmesi için ayrı bir render */}
+        {activeTab === 'ask-ai' ? (
+          <AskAITab 
+            combinedData={combinedData} 
+            isLoading={isLoading} 
+          />
         ) : (
-          <div style={styles.results}>
-            {activeTab === 'gtip' && results.length > 0 && (
-              <div style={styles.listContainer}>
-                <div style={styles.treeviewHeader}>
-                  <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>Kod</div>
-                  <div style={{ ...styles.headerCell, ...styles.headerCellDescription }}>Tanım</div>
-                </div>
-                <VirtualList
-                  items={results}
-                  height={350}
-                  rowHeight={40}
-                  rowRenderer={rowRenderer}
-                  ref={listRef}
+          <>
+            <div style={styles.searchContainer}>
+              <label style={styles.label} htmlFor="search-input">{activeTabData.label}</label>
+              <div style={styles.searchForm}>
+                {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 1 && (
+                  <button
+                    onClick={previousMatch}
+                    style={{
+                      ...styles.navButton,
+                      ...(searchResultsIndices.length <= 1 ? styles.navButtonDisabled : {})
+                    }}
+                    disabled={searchResultsIndices.length <= 1}
+                    title="Önceki eşleşme"
+                    aria-label="Önceki eşleşme"
+                  >
+                    ◄
+                  </button>
+                )}
+                <input
+                  id="search-input"
+                  ref={searchInputRef}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder={`${activeTabData.name} ...`}
+                  aria-label="Arama"
+                  style={styles.searchInput}
+                  autoComplete="off" 
                 />
+                <button 
+                  onClick={search} 
+                  disabled={isLoading}
+                  aria-label="Ara"
+                  style={{
+                    ...styles.searchButton,
+                    ...(isLoading ? styles.searchButtonDisabled : {})
+                  }}
+                >
+                  {isLoading ? 'Aranıyor...' : 'Ara'}
+                </button>
+                {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 1 && (
+                  <button
+                    onClick={nextMatch}
+                    style={{
+                      ...styles.navButton,
+                      ...(searchResultsIndices.length <= 1 ? styles.navButtonDisabled : {})
+                    }}
+                    disabled={searchResultsIndices.length <= 1}
+                    title="Sonraki eşleşme"
+                    aria-label="Sonraki eşleşme"
+                  >
+                    ►
+                  </button>
+                )}
               </div>
-            )}
-
-            {activeTab === 'izahname' && results.length > 0 && (
-              <div style={styles.izahnameResults}>
-                {results.map((r, i) => (
-                  <div key={i} style={styles.izahnameResult}>
-                    <p>{r.paragraph || ''}</p>
-                    <button 
-                      onClick={() => fetchDetail(r.index)} 
-                      style={styles.detailButton}
-                      aria-label="İzahname detayını görüntüle"
-                    >
-                      Detay...
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {activeTab === 'tarife' && results.length > 0 && (
-              <div style={{ ...styles.listContainer, margin: '0 auto' }}>
-                <div style={styles.treeviewHeader}>
-                  <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>1. Kolon</div>
-                  <div style={{ ...styles.headerCell, ...styles.headerCellDescription }}>2. Kolon</div>
+              {['tarife', 'esya-fihristi'].includes(activeTab) && searchResultsIndices.length > 0 && (
+                <div style={styles.matchInfo}>
+                  {currentMatchIndex >= 0 ? currentMatchIndex + 1 : 0} / {totalMatches} eşleşme
                 </div>
-                <VirtualList
-                  items={results}
-                  height={350}
-                  rowHeight={40}
-                  rowRenderer={rowRenderer}
-                  ref={listRef}
-                />
-              </div>
-            )}
+              )}
+            </div>
 
-            {activeTab === 'esya-fihristi' && results.length > 0 && (
-              <div style={{ ...styles.listContainer, margin: '0 auto' }}>
-                <div style={styles.treeviewHeader}>
-                  <div style={{ ...styles.headerCell, ...styles.headerCellItem }}>Eşya</div>
-                  <div style={{ ...styles.headerCell, ...styles.headerCellHarmonized }}>Armonize Sistem</div>
-                  <div style={{ ...styles.headerCell, ...styles.headerCellNotes }}>İzahname Notları</div>
-                </div>
-                <VirtualList
-                  items={results}
-                  height={350}
-                  rowHeight={40}
-                  rowRenderer={rowRenderer}
-                  ref={listRef}
-                />
-              </div>
-            )}
-            
-            {results.length === 0 && !isLoading && activeTab !== 'gtip' && activeTab !== 'izahname' && (
+            {activeTab === 'gtip' && results.length === 0 && !isLoading && (
               <div style={styles.emptyState}>
-                <p>Arama yapmak için yukarıdaki form alanını kullanın</p>
+                <p>Bu sayfada;</p>
+                <p>- 3824 veya 382410 şeklinde GTİP kodu ile aralarda noktalama işareti olmadan arama,</p>
+                <p>- dokunmuş boyalı poliester pamuk devamsız mensucat şeklinde aramak yerine,
+                  yazım sırası önemli olmadan; do bo pa po de me şeklinde arama,</p>
+                <p>- sülfirik veya sülfirik asit şeklinde arama yapabilirsiniz.</p>
               </div>
             )}
-          </div>
+
+            {activeTab === 'izahname' && results.length === 0 && !isLoading && !showDetail && (
+              <div style={styles.emptyState}>
+                <p>Bu sayfada;</p>
+                <p>- izahnamede aramak istediğiniz kelime veya kelimelerle arama,</p>
+                <p>- herhangi bir fasıl için arama yapmak istediğinizde 59.03 gibi arama,</p>
+                <p>yapabilirsiniz.</p>
+              </div>
+            )}
+
+            {isLoading && <div style={styles.loader} aria-label="Yükleniyor"></div>}
+
+            {!isLoading && showDetail ? (
+              <div style={styles.results}>
+                <div style={styles.detailHeaderContainer}>
+                  <h3 style={styles.detailHeaderTitle}>İzahname Detay</h3>
+                  <button 
+                    onClick={() => setShowDetail(false)}
+                    style={styles.backButton}
+                    aria-label="Geri dön"
+                  >
+                    <span>←</span> Geri Dön
+                  </button>
+                </div>
+                
+                <div 
+                  style={styles.izahnameDetailContainer} 
+                  className="custom-scrollbar"
+                  ref={detailContainerRef}
+                >
+                  {detailResults.map((result, index) => (
+                    <p 
+                      key={index} 
+                      style={result.isBold ? styles.boldText : {}}
+                      ref={result.isBold ? boldParagraphRef : null}
+                    >
+                      {result.paragraph || ''}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div style={styles.results}>
+                {activeTab === 'gtip' && results.length > 0 && (
+                  <div style={styles.listContainer}>
+                    <div style={styles.treeviewHeader}>
+                      <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>Kod</div>
+                      <div style={{ ...styles.headerCell, ...styles.headerCellDescription }}>Tanım</div>
+                    </div>
+                    <VirtualList
+                      items={results}
+                      height={350}
+                      rowHeight={40}
+                      rowRenderer={rowRenderer}
+                      ref={listRef}
+                    />
+                  </div>
+                )}
+
+                {activeTab === 'izahname' && results.length > 0 && (
+                  <div style={styles.izahnameResults}>
+                    {results.map((r, i) => (
+                      <div key={i} style={styles.izahnameResult}>
+                        <p>{r.paragraph || ''}</p>
+                        <button 
+                          onClick={() => fetchDetail(r.index)} 
+                          style={styles.detailButton}
+                          aria-label="İzahname detayını görüntüle"
+                        >
+                          Detay...
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {activeTab === 'tarife' && results.length > 0 && (
+                  <div style={{ ...styles.listContainer, margin: '0 auto' }}>
+                    <div style={styles.treeviewHeader}>
+                      <div style={{ ...styles.headerCell, ...styles.headerCellCode }}>1. Kolon</div>
+                      <div style={{ ...styles.headerCell, ...styles.headerCellDescription }}>2. Kolon</div>
+                    </div>
+                    <VirtualList
+                      items={results}
+                      height={350}
+                      rowHeight={40}
+                      rowRenderer={rowRenderer}
+                      ref={listRef}
+                    />
+                  </div>
+                )}
+
+                {activeTab === 'esya-fihristi' && results.length > 0 && (
+                  <div style={{ ...styles.listContainer, margin: '0 auto' }}>
+                    <div style={styles.treeviewHeader}>
+                      <div style={{ ...styles.headerCell, ...styles.headerCellItem }}>Eşya</div>
+                      <div style={{ ...styles.headerCell, ...styles.headerCellHarmonized }}>Armonize Sistem</div>
+                      <div style={{ ...styles.headerCell, ...styles.headerCellNotes }}>İzahname Notları</div>
+                    </div>
+                    <VirtualList
+                      items={results}
+                      height={350}
+                      rowHeight={40}
+                      rowRenderer={rowRenderer}
+                      ref={listRef}
+                    />
+                  </div>
+                )}
+                
+                {results.length === 0 && !isLoading && activeTab !== 'gtip' && activeTab !== 'izahname' && (
+                  <div style={styles.emptyState}>
+                    <p>Arama yapmak için yukarıdaki form alanını kullanın</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </main>
 
