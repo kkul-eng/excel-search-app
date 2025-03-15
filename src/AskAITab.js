@@ -5,6 +5,7 @@ import { askAI } from './AIServices';
  * Yapay Zekaya Sor sekmesi bileşeni - optimize edilmiş
  */
 const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
+  // State tanımlamaları
   const [question, setQuestion] = useState('');
   const [searchResults, setSearchResults] = useState({
     gtipResults: [],
@@ -16,18 +17,19 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [cacheStatus, setCacheStatus] = useState('idle');
+  
+  // Ref tanımlamaları
   const questionInputRef = useRef(null);
   const chatContainerRef = useRef(null);
 
-  // Önbellek yapısı - global değişken yerine Redux benzeri pattern kullan
+  // Önbellek yapısı - global değişken yerine useRef kullan
   const cacheRef = useRef({
     questions: {},
     searchResults: {},
     contexts: {},
     MAX_CACHE_SIZE: 50
   });
-
-  // LocalStorage'dan önbellek yükle 
+// LocalStorage'dan önbellek yükle 
   useEffect(() => {
     try {
       const storedCache = localStorage.getItem('aiCache');
@@ -90,8 +92,7 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
       }
     }, 0);
   }, []);
-
-  // Soru kelimelerini ayıklama - optimize edilmiş
+// Soru kelimelerini ayıklama - optimize edilmiş
   const extractKeywords = useCallback((text) => {
     // Türkçe soru kelimeleri ve bağlaçlar
     const filterWords = new Set([
@@ -244,8 +245,7 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
     
     return true;
   }, [question, cacheQuestion]);
-
-  // Soru sorma fonksiyonu - optimize edilmiş
+// Soru sorma fonksiyonu - optimize edilmiş
   const askQuestion = useCallback(async () => {
     const trimmedQuestion = question.trim();
     if (!trimmedQuestion) return;
@@ -352,7 +352,7 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
     }
   }, [askQuestion]);
 
-  // Focus input on tab selection
+  // Sekme seçildiğinde input'a odaklan
   useEffect(() => {
     if (questionInputRef.current) {
       questionInputRef.current.focus();
@@ -378,8 +378,7 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
       }
     }, 100);
   }, [askQuestion]);
-
-  // Styles
+// Stiller
   const styles = {
     container: {
       display: 'flex',
