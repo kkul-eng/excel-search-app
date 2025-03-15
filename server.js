@@ -9,8 +9,12 @@ const buildPath = path.resolve(__dirname, 'build');
 console.log('Build dosyaları aranacak yol:', buildPath);
 app.use(express.static(buildPath));
 
+// İzahname.txt dosyasının yolu
+const izahnameTextPath = path.resolve(__dirname, 'izahname.txt');
+console.log('İzahname.txt dosya yolu:', izahnameTextPath);
+
 // Excel dosyalarını bir kez oku ve önbellekte tut
-let gtipData, izahnameData, tarifeData, esyaFihristiData;
+let gtipData, izahnameData, tarifeData, esyaFihristiData, izahnameText;
 try {
   gtipData = XLSX.utils.sheet_to_json(XLSX.readFile('gtip.xls').Sheets[XLSX.readFile('gtip.xls').SheetNames[0]], { defval: '' });
   console.log('gtipData yüklendi:', gtipData.length, 'satır, sütunlar:', Object.keys(gtipData[0] || {}));
@@ -20,6 +24,15 @@ try {
   console.log('tarifeData yüklendi:', tarifeData.length, 'satır, sütunlar:', Object.keys(tarifeData[0] || {}));
   esyaFihristiData = XLSX.utils.sheet_to_json(XLSX.readFile('alfabetik_fihrist.xlsx').Sheets[XLSX.readFile('alfabetik_fihrist.xlsx').SheetNames[0]], { defval: '' });
   console.log('esyaFihristiData yüklendi:', esyaFihristiData.length, 'satır, sütunlar:', Object.keys(esyaFihristiData[0] || {}));
+  
+  // İzahname.txt dosyasını oku (varsa)
+  if (fs.existsSync(izahnameTextPath)) {
+    izahnameText = fs.readFileSync(izahnameTextPath, 'utf8');
+    console.log('izahnameText yüklendi:', Math.floor(izahnameText.length / 1024), 'KB');
+  } else {
+    console.log('izahnameText bulunamadı, bu dosya yapay zeka soruları için gerekli olabilir.');
+    izahnameText = '';
+  }
 } catch (error) {
   console.error('Excel dosyaları yüklenirken hata:', error);
 }
@@ -67,7 +80,7 @@ const kelimeArama = (data, searchText, columns) => {
   }
 };
 
-// GTİP arama endpoint’i
+// GTİP arama endpoint'i
 app.get('/api/gtip/search', (req, res) => {
   const query = turkceLower(req.query.query || '');
   console.log('GTİP arama sorgusu:', query);
@@ -81,7 +94,7 @@ app.get('/api/gtip/search', (req, res) => {
   }
 });
 
-// İzahname arama endpoint’i
+// İzahname arama endpoint'i
 app.get('/api/izahname/search', (req, res) => {
   const query = turkceLower(req.query.query || '');
   console.log('İzahname arama sorgusu:', query);
@@ -98,7 +111,7 @@ app.get('/api/izahname/search', (req, res) => {
   }
 });
 
-// İzahname detay endpoint’i
+// İzahname detay endpoint'i
 app.get('/api/izahname/context', (req, res) => {
   const index = parseInt(req.query.index, 10);
   console.log('İzahname detay sorgusu, index:', index);
@@ -125,7 +138,7 @@ app.get('/api/izahname/context', (req, res) => {
   }
 });
 
-// Tarife tüm veri endpoint’i
+// Tarife tüm veri endpoint'i
 app.get('/api/tarife/all', (req, res) => {
   console.log('Tarife tüm veri isteği alındı, satır sayısı:', tarifeData?.length || 0);
   try {
@@ -137,7 +150,7 @@ app.get('/api/tarife/all', (req, res) => {
   }
 });
 
-// Tarife arama endpoint’i
+// Tarife arama endpoint'i
 app.get('/api/tarife/search', (req, res) => {
   const query = turkceLower(req.query.query || '');
   console.log('Tarife arama sorgusu:', query);
@@ -151,7 +164,7 @@ app.get('/api/tarife/search', (req, res) => {
   }
 });
 
-// Eşya Fihristi tüm veri endpoint’i
+// Eşya Fihristi tüm veri endpoint'i
 app.get('/api/esya-fihristi/all', (req, res) => {
   console.log('Eşya Fihristi tüm veri isteği alındı, satır sayısı:', esyaFihristiData?.length || 0);
   try {
@@ -163,7 +176,7 @@ app.get('/api/esya-fihristi/all', (req, res) => {
   }
 });
 
-// Eşya Fihristi arama endpoint’i
+// Eşya Fihristi arama endpoint'i
 app.get('/api/esya-fihristi/search', (req, res) => {
   const query = turkceLower(req.query.query || '');
   console.log('Eşya Fihristi arama sorgusu:', query);
@@ -178,7 +191,24 @@ app.get('/api/esya-fihristi/search', (req, res) => {
   }
 });
 
-// Tüm diğer istekleri React’a yönlendir
+// İzahname.txt alma endpoint'i - Yapay Zeka için
+app.get('/api/izahname-text', (req, res) => {
+  console.log('İzahname.txt isteği alındı');
+  try {
+    if (!izahnameText) {
+      console.log('İzahname.txt verisi bulunamadı');
+      res.status(404).json({ error: 'İzahname.txt dosyası bulunamadı' });
+      return;
+    }
+    
+    res.json({ content: izahnameText });
+  } catch (error) {
+    console.error('İzahname.txt gönderme hatası:', error);
+    res.status(500).json({ error: 'Veri gönderilirken hata oluştu: ' + error.message });
+  }
+});
+
+// Tüm diğer istekleri React'a yönlendir
 app.get('*', (req, res) => {
   const indexPath = path.resolve(__dirname, 'build', 'index.html');
   console.log('index.html gönderiliyor, yol:', indexPath);
