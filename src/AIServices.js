@@ -3,23 +3,22 @@
 
 const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyD4XHl_tmjeLX4SlENsngRy9auqNGpTuXk";
 
-// API cevapları için cache
+// AI cevap önbelleği
 const aiCache = {
   cache: {},
-  MAX_CACHE_SIZE: 100, // Maksimum önbellek boyutu
+  MAX_CACHE_SIZE: 100,
   
-  // Cache'i temizleme fonksiyonu
+  // Önbelleği temizle
   prune() {
     const keys = Object.keys(this.cache);
     if (keys.length > this.MAX_CACHE_SIZE) {
-      // En eski 20 girişi sil
       const keysToRemove = keys.slice(0, 20);
       keysToRemove.forEach(key => delete this.cache[key]);
       console.log('API önbelleği temizlendi, 20 eski giriş silindi.');
     }
   },
 
-  // Cache'e kaydetme
+  // Önbelleğe kaydet
   set(key, value) {
     this.cache[key] = {
       timestamp: Date.now(),
@@ -27,7 +26,6 @@ const aiCache = {
     };
     this.prune();
     
-    // LocalStorage'a da kaydet (kalıcı depolama)
     try {
       const storageKey = `ai_cache_${key}`;
       localStorage.setItem(storageKey, JSON.stringify({
@@ -39,15 +37,15 @@ const aiCache = {
     }
   },
 
-  // Cache'den getirme
+  // Önbellekten getir
   get(key) {
-    // Önce memory cache'de kontrol et
+    // Önce bellek önbelleğinde kontrol et
     const cachedItem = this.cache[key];
     if (cachedItem) {
       return cachedItem.value;
     }
     
-    // Memory cache'de yoksa localStorage'ı kontrol et
+    // Bellek önbelleğinde yoksa localStorage'da kontrol et
     try {
       const storageKey = `ai_cache_${key}`;
       const storedItem = localStorage.getItem(storageKey);
