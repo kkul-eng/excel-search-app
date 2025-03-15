@@ -4,24 +4,148 @@ import { askAI } from './AIServices';
 /**
  * Yapay Zekaya Sor sekmesi bileşeni
  */
-const AskAITab = ({ combinedData, isLoading }) => {
-  // İzahname.txt dosyasını almak için state
-  const [izahnameText, setIzahnameText] = useState('');
-  const [isIzahnameTextLoading, setIsIzahnameTextLoading] = useState(false);
-  const [izahnameTextError, setIzahnameTextError] = useState(null);
+const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
   const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState('');
+  const [searchResults, setSearchResults] = useState({
+    gtipResults: [],
+    izahnameResults: [],
+    izahnameContext: []
+  });
   const [isAsking, setIsAsking] = useState(false);
   const [chatHistory, setChatHistory] = useState([]);
   const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const questionInputRef = useRef(null);
   const chatContainerRef = useRef(null);
+
+  // Soru kelimelerini ayıklama (soru kelimelerini çıkar)
+  const extractKeywords = (text) => {
+    // Türkçe soru kelimeleri
+    const questionWords = [
+      'ne', 'nasıl', 'neden', 'niçin', 'niye', 'kim', 'kime', 'kimi', 'kiminle', 'kimden',
+      'nerede', 'nereye', 'nereden', 'neresi', 'hangisi', 'hangi', 'kaç', 'kaçta', 'ne zaman',
+      'mi', 'mı', 'mu', 'mü', 'değil mi', 'değil mı', 'değil mu', 'değil mü',
+      'mıdır', 'midir', 'mudur', 'müdür', 'acaba', 'hiç'
+    ];
+    
+    // Boşlukları temizle, noktalama işaretlerini kaldır, küçük harfe çevir
+    const cleanText = text
+      .toLowerCase()
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '')
+      .replace(/\s\s+/g, ' ');
+    
+    // Kelimelere ayır
+    const words = cleanText.split(' ');
+    
+    // Soru kelimelerini ve 3 karakterden kısa kelimeleri çıkar
+    const keywords = words.filter(word => 
+      !questionWords.includes(word) && word.length >= 3
+    );
+    
+    // Tekrar eden kelimeleri çıkar
+    return [...new Set(keywords)];
+  };
+
+  // GTİP araması
+  const searchGtip = async (keywords) => {
+    try {
+      if (!keywords || keywords.length === 0) return [];
+      
+      // Anahtar kelimelerle arama yap (her kelime için ayrı arama)
+      const results = [];
+      
+      for (const keyword of keywords) {
+        const response = await fetch(`/api/gtip/search?query=${encodeURIComponent(keyword)}`);
+        
+        if (!response.ok) {
+          throw new Error(`GTİP araması başarısız: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data && data.length > 0) {
+          results.push(...data);
+        }
+      }
+      
+      // Tekrarlanan sonuçları çıkar
+      const uniqueResults = results.filter((item, index, self) =>
+        index === self.findIndex((t) => t.Kod === item.Kod)
+      );
+      
+      // En fazla 10 sonuç göster
+      return uniqueResults.slice(0, 10);
+    } catch (error) {
+      console.error('GTİP arama hatası:', error);
+      return [];
+    }
+  };
+
+  // İzahname araması
+  const searchIzahname = async (keywords) => {
+    try {
+      if (!keywords || keywords.length === 0) return { results: [], context: [] };
+      
+      // Anahtar kelimelerle arama yap (her kelime için ayrı arama)
+      const results = [];
+      
+      for (const keyword of keywords) {
+        const response = await fetch(`/api/izahname/search?query=${encodeURIComponent(keyword)}`);
+        
+        if (!response.ok) {
+          throw new Error(`İzahname araması başarısız: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data && data.length > 0) {
+          results.push(...data);
+        }
+      }
+      
+      // Tekrarlanan sonuçları çıkar
+      const uniqueResults = results.filter((item, index, self) =>
+        index === self.findIndex((t) => t.index === item.index)
+      );
+      
+      // En fazla 5 sonuç göster
+      const topResults = uniqueResults.slice(0, 5);
+      
+      // İlk sonuç için bağlam al (paragraf önce/sonra)
+      let context = [];
+      if (topResults.length > 0) {
+        const firstResult = topResults[0];
+        context = await fetchIzahnameContext(firstResult.index);
+      }
+      
+      return { results: topResults, context };
+    } catch (error) {
+      console.error('İzahname arama hatası:', error);
+      return { results: [], context: [] };
+    }
+  };
+
+  // İzahname bağlam alma
+  const fetchIzahnameContext = async (index) => {
+    try {
+      const response = await fetch(`/api/izahname/context?index=${index}`);
+      
+      if (!response.ok) {
+        throw new Error(`İzahname detayı alınamadı: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data || [];
+    } catch (error) {
+      console.error('İzahname detay hatası:', error);
+      return [];
+    }
+  };
 
   // Soru sorma fonksiyonu
   const askQuestion = async () => {
     if (!question.trim()) return;
     
     try {
+      setIsLoading(true);
       setIsAsking(true);
       setError(null);
       
@@ -29,23 +153,31 @@ const AskAITab = ({ combinedData, isLoading }) => {
       const newChat = [...chatHistory, { type: 'question', text: question }];
       setChatHistory(newChat);
       
-      // Kullanılacak bağlamı seç
-      let context;
+      // Anahtar kelimeleri çıkar
+      const keywords = extractKeywords(question);
+      console.log('Anahtar kelimeler:', keywords);
       
-      // İzahname.txt dosyası varsa, onu kullan
-      if (izahnameText) {
-        context = izahnameText;
-      } else {
-        // Yoksa, API'den alınan verileri birleştir
-        context = prepareContext(combinedData);
-      }
+      // GTİP araması yap
+      const gtipResults = await searchGtip(keywords);
+      
+      // İzahname araması yap
+      const { results: izahnameResults, context: izahnameContext } = await searchIzahname(keywords);
+      
+      // Sonuçları kaydet
+      setSearchResults({
+        gtipResults,
+        izahnameResults,
+        izahnameContext
+      });
+      
+      // API için bağlamı hazırla
+      let context = prepareContextFromResults(gtipResults, izahnameResults, izahnameContext);
       
       // API'ye soruyu sor
       const aiAnswer = await askAI(context, question);
       
       // Cevabı geçmişe ekle
       setChatHistory([...newChat, { type: 'answer', text: aiAnswer }]);
-      setQuestion('');
       
       // Sohbet alanını en aşağıya kaydır
       scrollToBottom();
@@ -53,20 +185,19 @@ const AskAITab = ({ combinedData, isLoading }) => {
       console.error('Yapay zeka soru hatası:', err);
       setError(`Soru sorulurken bir hata oluştu: ${err.message}`);
     } finally {
+      setIsLoading(false);
       setIsAsking(false);
     }
   };
 
-  // Context hazırlama
-  const prepareContext = (data) => {
-    if (!data) return '';
-    
+  // Sonuçlardan bağlam oluştur
+  const prepareContextFromResults = (gtipResults, izahnameResults, izahnameContext) => {
     let context = '';
     
-    // GTIP verisi
-    if (data.gtipData && Array.isArray(data.gtipData)) {
+    // GTIP verileri
+    if (gtipResults && gtipResults.length > 0) {
       context += "--- GTİP Verileri ---\n";
-      data.gtipData.forEach(item => {
+      gtipResults.forEach(item => {
         if (item.Kod && item.Tanım) {
           context += `Kod: ${item.Kod}, Tanım: ${item.Tanım}\n`;
         }
@@ -74,41 +205,35 @@ const AskAITab = ({ combinedData, isLoading }) => {
       context += "\n";
     }
     
-    // İzahname verisi
-    if (data.izahnameData && Array.isArray(data.izahnameData)) {
-      context += "--- İzahname Verileri ---\n";
-      data.izahnameData.forEach(item => {
-        if (item.paragraf) {
-          context += `${item.paragraf}\n`;
+    // İzahname sonuçları
+    if (izahnameResults && izahnameResults.length > 0) {
+      context += "--- İzahname Sonuçları ---\n";
+      izahnameResults.forEach(item => {
+        if (item.paragraph) {
+          context += `${item.paragraph}\n`;
         }
       });
       context += "\n";
     }
     
-    // Tarife verisi
-    if (data.tarifeData && Array.isArray(data.tarifeData)) {
-      context += "--- Tarife Verileri ---\n";
-      data.tarifeData.forEach(item => {
-        if (item['1. Kolon'] && item['2. Kolon']) {
-          context += `${item['1. Kolon']}: ${item['2. Kolon']}\n`;
+    // İzahname bağlam
+    if (izahnameContext && izahnameContext.length > 0) {
+      context += "--- İzahname Bağlam ---\n";
+      izahnameContext.forEach(item => {
+        if (item.paragraph) {
+          context += `${item.paragraph}\n`;
         }
       });
       context += "\n";
     }
     
-    // Eşya Fihristi verisi
-    if (data.esyaFihristiData && Array.isArray(data.esyaFihristiData)) {
-      context += "--- Eşya Fihristi Verileri ---\n";
-      data.esyaFihristiData.forEach(item => {
-        if (item['Eşya'] && item['Armonize Sistem']) {
-          context += `Eşya: ${item['Eşya']}, Armonize Sistem: ${item['Armonize Sistem']}`;
-          if (item['İzahname Notları']) {
-            context += `, İzahname Notları: ${item['İzahname Notları']}`;
-          }
-          context += "\n";
-        }
-      });
-    }
+    // Genel bağlam ekle
+    context += "\n--- Genel Bilgiler ---\n";
+    context += "GTİP (Gümrük Tarife İstatistik Pozisyonu) kodları, gümrük işlemlerinde kullanılan uluslararası kodlardır. ";
+    context += "Her ürünün kendine özgü bir GTİP kodu vardır ve bu kod ürünün gümrük işlemlerinde vergilendirme oranını belirler. ";
+    context += "Armonize Sistem Nomenklatürü, uluslararası ticarette ürünlerin sınıflandırılması için kullanılan standart bir sistemdir. ";
+    context += "İzahname, gümrük tarife pozisyonlarının detaylı açıklamalarını içerir. ";
+    context += "Eşya fihristi, alfabetik dizin şeklinde eşyaların hangi GTİP koduna girdiğini gösteren kılavuzdur.";
     
     return context;
   };
@@ -130,37 +255,6 @@ const AskAITab = ({ combinedData, isLoading }) => {
     }
   };
 
-  // İzahname.txt dosyasını yükle
-  useEffect(() => {
-    const fetchIzahnameText = async () => {
-      try {
-        setIsIzahnameTextLoading(true);
-        setIzahnameTextError(null);
-        
-        const response = await fetch('/api/izahname-text');
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            console.log('İzahname.txt dosyası sunucuda bulunamadı');
-          } else {
-            throw new Error(`İzahname.txt alınamadı: ${response.status}`);
-          }
-        } else {
-          const data = await response.json();
-          setIzahnameText(data.content || '');
-          console.log('İzahname.txt yüklendi:', Math.floor((data.content?.length || 0) / 1024), 'KB');
-        }
-      } catch (error) {
-        console.error('İzahname.txt yükleme hatası:', error);
-        setIzahnameTextError(`İzahname.txt dosyası yüklenirken hata oluştu: ${error.message}`);
-      } finally {
-        setIsIzahnameTextLoading(false);
-      }
-    };
-    
-    fetchIzahnameText();
-  }, []);
-
   // Focus input on tab selection
   useEffect(() => {
     if (questionInputRef.current) {
@@ -179,40 +273,62 @@ const AskAITab = ({ combinedData, isLoading }) => {
       borderRadius: '8px',
       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
     },
-    chatArea: {
-      flex: 1,
-      overflowY: 'auto',
-      marginBottom: '15px',
-      padding: '15px',
-      backgroundColor: '#f8fafc',
+    searchResultsContainer: {
+      marginBottom: '20px',
+      border: '1px solid #e2e8f0',
       borderRadius: '8px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '15px',
+      overflow: 'hidden',
     },
-    questionBubble: {
-      alignSelf: 'flex-end',
+    searchResultsHeader: {
+      padding: '10px 15px',
       backgroundColor: '#2563eb',
       color: 'white',
-      padding: '10px 15px',
-      borderRadius: '18px 18px 0 18px',
-      maxWidth: '80%',
-      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-      wordBreak: 'break-word',
+      fontWeight: '600',
+      fontSize: '16px',
+      display: 'flex',
+      justifyContent: 'space-between',
     },
-    answerBubble: {
-      alignSelf: 'flex-start',
-      backgroundColor: '#e2e8f0',
-      color: '#1e293b',
+    searchResultsBody: {
+      maxHeight: '200px',
+      overflowY: 'auto',
+    },
+    gtipItem: {
+      display: 'flex',
       padding: '10px 15px',
-      borderRadius: '18px 18px 18px 0',
-      maxWidth: '80%',
-      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-      wordBreak: 'break-word',
+      borderBottom: '1px solid #e2e8f0',
+      fontSize: '14px',
+    },
+    gtipCode: {
+      width: '150px',
+      fontWeight: '500',
+      flexShrink: 0,
+    },
+    gtipDesc: {
+      flex: 1,
+    },
+    aiAnswerContainer: {
+      padding: '15px',
+      backgroundColor: '#f0f9ff',
+      borderRadius: '8px',
+      marginBottom: '20px',
+      border: '1px solid #bae6fd',
+    },
+    aiAnswerHeader: {
+      fontWeight: '600',
+      marginBottom: '10px',
+      color: '#0369a1',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '5px',
+    },
+    aiAnswerText: {
+      lineHeight: '1.6',
+      whiteSpace: 'pre-wrap',
     },
     inputArea: {
       display: 'flex',
       gap: '10px',
+      marginTop: 'auto',
     },
     textArea: {
       flex: 1,
@@ -252,75 +368,154 @@ const AskAITab = ({ combinedData, isLoading }) => {
       fontSize: '14px',
       fontWeight: '500',
     },
+    noResults: {
+      padding: '15px',
+      textAlign: 'center',
+      color: '#64748b',
+      fontStyle: 'italic',
+    },
+    loadingSpinner: {
+      display: 'inline-block',
+      width: '16px',
+      height: '16px',
+      border: '2px solid #bfdbfe',
+      borderTopColor: '#3b82f6',
+      borderRadius: '50%',
+      animation: 'spin 1s linear infinite',
+      marginRight: '8px',
+    },
+    keywordsContainer: {
+      display: 'flex',
+      gap: '5px',
+      flexWrap: 'wrap',
+      marginBottom: '10px',
+    },
+    keywordTag: {
+      padding: '2px 8px',
+      backgroundColor: '#e2e8f0',
+      borderRadius: '12px',
+      fontSize: '12px',
+      color: '#475569',
+    },
     emptyState: {
       flex: 1,
       display: 'flex',
-      flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
+      flexDirection: 'column',
+      padding: '40px 20px',
+      textAlign: 'center',
       color: '#64748b',
-      padding: '20px',
     },
-    emptyTitle: {
+    emptyStateIcon: {
+      fontSize: '32px',
+      marginBottom: '20px',
+      color: '#94a3b8',
+    },
+    emptyStateTitle: {
       fontSize: '18px',
       fontWeight: '600',
       marginBottom: '10px',
     },
-    emptyText: {
+    emptyStateText: {
       fontSize: '14px',
-      textAlign: 'center',
       maxWidth: '400px',
+      lineHeight: '1.6',
     },
-    loadingText: {
+    emptyStateExamples: {
+      marginTop: '20px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '10px',
       fontSize: '14px',
-      color: '#64748b',
-      fontStyle: 'italic',
-      textAlign: 'center',
-      margin: '20px 0',
     },
+    emptyStateExample: {
+      padding: '10px',
+      backgroundColor: '#f1f5f9',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      ':hover': {
+        backgroundColor: '#e2e8f0',
+      }
+    },
+  };
+
+  // Örnek sorular
+  const exampleQuestions = [
+    "Pamuklu gömlekler hangi GTİP koduna girer?",
+    "İpek kumaşların vergi oranı nedir?",
+    "Soğan tohumları ne kadar vergi öder?",
+    "Fasıllar arasındaki farklar nelerdir?"
+  ];
+
+  // Örnek soru seçildiğinde
+  const handleExampleClick = (exampleQuestion) => {
+    setQuestion(exampleQuestion);
+    if (questionInputRef.current) {
+      questionInputRef.current.focus();
+    }
   };
 
   return (
     <div style={styles.container}>
       {error && <div style={styles.errorMessage}>{error}</div>}
       
-      <div 
-        ref={chatContainerRef} 
-        style={styles.chatArea} 
-        className="custom-scrollbar"
-      >
-        {isLoading || isIzahnameTextLoading ? (
-          <div style={styles.loadingText}>
-            {isIzahnameTextLoading 
-              ? 'İzahname.txt dosyası yükleniyor... Bu biraz zaman alabilir.' 
-              : 'Veriler yükleniyor... Bu biraz zaman alabilir.'}
+      {/* GTİP Sonuçları */}
+      {searchResults.gtipResults && searchResults.gtipResults.length > 0 && (
+        <div style={styles.searchResultsContainer}>
+          <div style={styles.searchResultsHeader}>
+            <span>GTİP Arama Sonuçları</span>
+            <span>{searchResults.gtipResults.length} sonuç</span>
           </div>
-        ) : chatHistory.length === 0 ? (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyTitle}>Yapay Zekaya Sorunuzu Sorun</div>
-            <p style={styles.emptyText}>
-              Gümrük tarife, GTİP, izahname veya eşya fihristi ile ilgili sorularınızı yapay zekaya sorabilirsiniz.
-              Örneğin: "Pamuklu gömlek hangi GTİP'e girer?" veya "Şeftali konservesi için vergi oranı nedir?"
-            </p>
+          <div style={styles.searchResultsBody} className="custom-scrollbar">
+            {searchResults.gtipResults.map((item, index) => (
+              <div key={index} style={styles.gtipItem}>
+                <div style={styles.gtipCode}>{item.Kod || ''}</div>
+                <div style={styles.gtipDesc}>{item.Tanım || ''}</div>
+              </div>
+            ))}
           </div>
-        ) : (
-          chatHistory.map((chat, index) => (
-            <div 
-              key={index} 
-              style={chat.type === 'question' ? styles.questionBubble : styles.answerBubble}
-            >
-              {chat.text}
-            </div>
-          ))
-        )}
-        
-        {isAsking && (
-          <div style={styles.answerBubble}>
-            <div>Yanıt hazırlanıyor...</div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
       
+      {/* Yapay Zeka Cevabı */}
+      {chatHistory.length > 0 && chatHistory[chatHistory.length - 1].type === 'answer' && (
+        <div style={styles.aiAnswerContainer}>
+          <div style={styles.aiAnswerHeader}>
+            <span>Yapay Zeka Cevabı</span>
+          </div>
+          <div style={styles.aiAnswerText}>
+            {chatHistory[chatHistory.length - 1].text}
+          </div>
+        </div>
+      )}
+      
+      {/* Boş Durum */}
+      {chatHistory.length === 0 && (
+        <div style={styles.emptyState}>
+          <div style={styles.emptyStateIcon}>🔍</div>
+          <div style={styles.emptyStateTitle}>Yapay Zekaya Sorunuzu Sorun</div>
+          <p style={styles.emptyStateText}>
+            Gümrük tarifeleri, GTİP kodları, eşya sınıflandırması veya ithalat/ihracat işlemleri hakkında sorularınızı buradan sorabilirsiniz.
+          </p>
+          
+          <div style={styles.emptyStateExamples}>
+            <div>Örnek sorular:</div>
+            {exampleQuestions.map((q, i) => (
+              <div 
+                key={i} 
+                style={styles.emptyStateExample}
+                onClick={() => handleExampleClick(q)}
+              >
+                {q}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Soru Giriş Alanı */}
       <div style={styles.inputArea}>
         <textarea
           ref={questionInputRef}
@@ -329,32 +524,24 @@ const AskAITab = ({ combinedData, isLoading }) => {
           onKeyPress={handleKeyPress}
           placeholder="Sorunuzu buraya yazın... (Örn: Pamuklu gömlekler hangi GTİP'e girer?)"
           style={styles.textArea}
-          disabled={isAsking || isLoading || isIzahnameTextLoading}
+          disabled={isAsking || isLoading}
         />
         <button
           onClick={askQuestion}
-          disabled={isAsking || !question.trim() || isLoading || isIzahnameTextLoading}
+          disabled={isAsking || !question.trim() || isLoading}
           style={{
             ...styles.button,
-            ...(isAsking || !question.trim() || isLoading || isIzahnameTextLoading ? styles.disabledButton : {})
+            ...(isAsking || !question.trim() || isLoading ? styles.disabledButton : {})
           }}
         >
-          {isAsking ? 'Soruluyor...' : 'Sor'}
+          {isAsking ? (
+            <>
+              <span style={styles.loadingSpinner}></span>
+              Soruluyor...
+            </>
+          ) : 'Sor'}
         </button>
       </div>
-      
-      {/* İzahname.txt durum bilgisi */}
-      {izahnameText && (
-        <div style={{ fontSize: '12px', color: '#64748b', marginTop: '10px', textAlign: 'center' }}>
-          İzahname.txt dosyası kullanılıyor ({Math.floor(izahnameText.length / 1024)} KB)
-        </div>
-      )}
-      
-      {izahnameTextError && (
-        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '10px', textAlign: 'center' }}>
-          {izahnameTextError}
-        </div>
-      )}
     </div>
   );
 };
