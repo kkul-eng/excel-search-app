@@ -1,4 +1,4 @@
-// İzahname araması - memoization ile iyileştirilmiş
+// İzahname araması
   const searchIzahname = useCallback(async (keywords, useCache = true) => {
     try {
       if (!keywords || keywords.length === 0) return { results: [], context: [] };
@@ -60,7 +60,7 @@
     }
   }, []);
 
-  // İzahname bağlam alma - cache ile iyileştirilmiş
+  // İzahname bağlam alma
   const fetchIzahnameContext = useCallback(async (index, useCache = true) => {
     try {
       // Cache anahtar oluştur
@@ -92,11 +92,11 @@
     }
   }, []);
 
-  // Sonuçlardan bağlam oluştur ve tablolaştır
+  // Sonuçlardan bağlam oluştur
   const prepareContextFromResults = useCallback((gtipResults, izahnameResults, izahnameContext) => {
     let context = '';
     
-    // GTIP verileri - Python kodundaki gibi tablo formatında
+    // GTIP verileri - tablo formatında
     if (gtipResults && gtipResults.length > 0) {
       context += "--- GTİP Verileri ---\n";
       context += "Kod\tTanım\n";
@@ -151,7 +151,7 @@
     }
   }, []);
 
-  // Soru sorma fonksiyonu - cache ile iyileştirilmiş ve arama sonuçlarını tablo olarak gösterme
+  // Soru sorma fonksiyonu
   const askQuestion = useCallback(async () => {
     if (!question.trim()) return;
     
@@ -161,7 +161,7 @@
       setError(null);
       
       // Cache'den kontrol et
-      const cachedData = window.askAICache.getAnswer(question);
+      const cachedData = window.askAICache?.getAnswer(question) || { answer: null };
       if (cachedData.answer) {
         setCacheStatus('hit');
         console.log('Cache hit: Yanıt önbellekten alındı');
@@ -183,7 +183,7 @@
           scrollToBottom();
           setIsLoading(false);
           setIsAsking(false);
-        }, 300); // Daha kısa gecikme ile önbellekten hızlı cevap
+        }, 300);
         
         return;
       }
@@ -227,7 +227,9 @@
         setChatHistory([...newChat, { type: 'answer', text: tableResponse }]);
         
         // Cache'e kaydet
-        window.askAICache.addQuestion(question, tableResponse, currentSearchResults, "");
+        if (window.askAICache) {
+          window.askAICache.addQuestion(question, tableResponse, currentSearchResults, "");
+        }
         
         // Şimdilik işlemi sonlandır, daha fazla API çağrısı yapma
         setIsLoading(false);
@@ -260,7 +262,9 @@
       setChatHistory([...newChat, { type: 'answer', text: aiAnswer }]);
       
       // Cache'e kaydet
-      window.askAICache.addQuestion(question, aiAnswer, currentSearchResults, context);
+      if (window.askAICache) {
+        window.askAICache.addQuestion(question, aiAnswer, currentSearchResults, context);
+      }
       
       // Sohbet alanını en aşağıya kaydır
       scrollToBottom();
@@ -284,6 +288,22 @@
 
   // Focus input on tab selection
   useEffect(() => {
+    if (questionInputRef.current) {
+      questionInputRef.current.focus();
+    }
+  }, []);
+
+  // Örnek sorular
+  const exampleQuestions = [
+    "Pamuklu gömlekler hangi GTİP koduna girer?",
+    "İpek kumaşların vergi oranı nedir?",
+    "Soğan tohumları ne kadar vergi öder?",
+    "Fasıllar arasındaki farklar nelerdir?"
+  ];
+
+  // Örnek soru seçildiğinde
+  const handleExampleClick = useCallback((exampleQuestion) => {
+    setQuestion(exampleQuestion);
     if (questionInputRef.current) {
       questionInputRef.current.focus();
     }
@@ -318,25 +338,6 @@
     searchResultsBody: {
       maxHeight: '200px',
       overflowY: 'auto',
-    },
-    aiAnswerContainer: {
-      padding: '15px',
-      backgroundColor: '#f0f9ff',
-      borderRadius: '8px',
-      marginBottom: '20px',
-      border: '1px solid #bae6fd',
-    },
-    aiAnswerHeader: {
-      fontWeight: '600',
-      marginBottom: '10px',
-      color: '#0369a1',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '5px',
-    },
-    aiAnswerText: {
-      lineHeight: '1.6',
-      whiteSpace: 'pre-wrap',
     },
     chatHistoryContainer: {
       flex: 1,
@@ -457,22 +458,6 @@
       transition: 'all 0.2s ease',
     }
   };
-
-  // Örnek sorular
-  const exampleQuestions = [
-    "Pamuklu gömlekler hangi GTİP koduna girer?",
-    "İpek kumaşların vergi oranı nedir?",
-    "Soğan tohumları ne kadar vergi öder?",
-    "Fasıllar arasındaki farklar nelerdir?"
-  ];
-
-  // Örnek soru seçildiğinde
-  const handleExampleClick = useCallback((exampleQuestion) => {
-    setQuestion(exampleQuestion);
-    if (questionInputRef.current) {
-      questionInputRef.current.focus();
-    }
-  }, []);
 
   return (
     <div style={styles.container}>
