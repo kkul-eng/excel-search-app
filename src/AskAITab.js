@@ -96,14 +96,16 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
     cache.loadFromStorage();
   }, []);
 
-  // Soru kelimelerini ayıklama (soru kelimelerini çıkar)
+  // Soru kelimelerini ayıklama ve arama için anahtar kelimeler çıkarma
   const extractKeywords = useCallback((text) => {
-    // Türkçe soru kelimeleri
-    const questionWords = [
+    // Türkçe soru kelimeleri ve bağlaçlar
+    const filterWords = [
       'ne', 'nasıl', 'neden', 'niçin', 'niye', 'kim', 'kime', 'kimi', 'kiminle', 'kimden',
       'nerede', 'nereye', 'nereden', 'neresi', 'hangisi', 'hangi', 'kaç', 'kaçta', 'ne zaman',
       'mi', 'mı', 'mu', 'mü', 'değil mi', 'değil mı', 'değil mu', 'değil mü',
-      'mıdır', 'midir', 'mudur', 'müdür', 'acaba', 'hiç'
+      'mıdır', 'midir', 'mudur', 'müdür', 'acaba', 'hiç',
+      've', 'veya', 'ile', 'de', 'da', 'ki', 'için', 'gibi', 'ise', 'ama', 'fakat',
+      'sınıflandırılır', 'girer', 'olur', 'edilir', 'yapılır', 'bulunur', 'yer alır'
     ];
     
     // Boşlukları temizle, noktalama işaretlerini kaldır, küçük harfe çevir
@@ -115,22 +117,24 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
     // Kelimelere ayır
     const words = cleanText.split(' ');
     
-    // Soru kelimelerini ve 3 karakterden kısa kelimeleri çıkar
+    // Filtreleme kelimeleri ve 2 karakterden kısa kelimeleri çıkar
     const keywords = words.filter(word => 
-      !questionWords.includes(word) && word.length >= 3
+      !filterWords.includes(word) && word.length > 2
     );
     
-    // Tekrar eden kelimeleri çıkar
+    // Tekrar eden kelimeleri çıkar ve anlamlı bir arama seti oluştur
     return [...new Set(keywords)];
   }, []);
 
-  // GTİP araması - memoization ile iyileştirilmiş
+  // GTİP araması - Python koduna göre yeniden düzenlenmiş ve önbellekli
   const searchGtip = useCallback(async (keywords, useCache = true) => {
     try {
       if (!keywords || keywords.length === 0) return [];
       
+      // Tam metin arama sorgusu oluştur
+      const searchText = keywords.join(' ');
       // Cache anahtar oluştur
-      const cacheKey = `gtip:${keywords.sort().join(',')}`;
+      const cacheKey = `gtip:${searchText}`;
       
       // Cache kontrolü
       if (useCache) {
@@ -140,37 +144,34 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
         }
       }
       
-      // Anahtar kelimelerle arama yap (her kelime için ayrı arama)
-      const results = [];
-      const promises = keywords.map(keyword => 
-        fetch(`/api/gtip/search?query=${encodeURIComponent(keyword)}`)
-          .then(response => {
-            if (!response.ok) {
-              throw new Error(`GTİP araması başarısız: ${response.status}`);
-            }
-            return response.json();
-          })
-          .then(data => {
-            if (data && data.length > 0) {
-              results.push(...data);
-            }
-          })
-      );
-      
-      await Promise.all(promises);
-      
-      // Tekrarlanan sonuçları çıkar
-      const uniqueResults = results.filter((item, index, self) =>
-        index === self.findIndex((t) => t.Kod === item.Kod)
-      );
-      
-      // En fazla 10 sonuç göster
-      const finalResults = uniqueResults.slice(0, 10);
-      
-      // Cache'e kaydet
-      sessionStorage.setItem(cacheKey, JSON.stringify(finalResults));
-      
-      return finalResults;
+      // Sayısal sorgu için doğrudan kod araması yap
+      if (/^\d+$/.test(searchText)) {
+        const response = await fetch(`/api/gtip/search?query=${encodeURIComponent(searchText)}`);
+        
+        if (!response.ok) {
+          throw new Error(`GTİP araması başarısız: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        // Cache'e kaydet
+        sessionStorage.setItem(cacheKey, JSON.stringify(data || []));
+        return data || [];
+      } 
+      // Metin sorgusunda tüm kelimeleri içeren kayıtları bul (Python'daki all(keyword in x) mantığı)
+      else {
+        // Tüm arama metnini tek bir sorgu olarak gönder
+        const response = await fetch(`/api/gtip/search?query=${encodeURIComponent(searchText)}`);
+        
+        if (!response.ok) {
+          throw new Error(`GTİP araması başarısız: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Cache'e kaydet
+        sessionStorage.setItem(cacheKey, JSON.stringify(data || []));
+        return data || [];
+      }
     } catch (error) {
       console.error('GTİP arama hatası:', error);
       return [];
@@ -271,7 +272,7 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
     }
   }, []);
 
-  // Soru sorma fonksiyonu - cache ile iyileştirilmiş
+  // Soru sorma fonksiyonu - cache ile iyileştirilmiş ve arama sonuçlarını tablo olarak gösterme
   const askQuestion = useCallback(async () => {
     if (!question.trim()) return;
     
@@ -303,7 +304,7 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
           scrollToBottom();
           setIsLoading(false);
           setIsAsking(false);
-        }, 500); // Yapay bir gecikme ekleyerek kullanıcı deneyimini iyileştirme
+        }, 300); // Daha kısa gecikme ile önbellekten hızlı cevap
         
         return;
       }
@@ -319,12 +320,46 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
       const keywords = extractKeywords(question);
       console.log('Anahtar kelimeler:', keywords);
       
-      // Paralel arama işlemlerini başlat
-      const [gtipResults, izahnameSearchResults] = await Promise.all([
-        searchGtip(keywords),
-        searchIzahname(keywords)
-      ]);
+      // Önce GTİP araması yap ve sonuçları göster
+      const gtipResults = await searchGtip(keywords);
       
+      // GTİP sonuçları varsa, bunları direkt ekranda göster
+      if (gtipResults && gtipResults.length > 0) {
+        // Sonuçları kaydet
+        const currentSearchResults = {
+          gtipResults,
+          izahnameResults: [],
+          izahnameContext: []
+        };
+        
+        setSearchResults(currentSearchResults);
+        
+        // Python kodundaki gibi HTML tablo formatında bir sonuç oluştur
+        let tableResponse = "";
+        
+        if (gtipResults.length > 0) {
+          tableResponse = "GTİP sonuçları:\n\n";
+          gtipResults.forEach(item => {
+            tableResponse += `Kod: ${item.Kod}, Tanım: ${item.Tanım}\n`;
+          });
+        }
+        
+        // Cevabı kullanıcıya göster
+        setChatHistory([...newChat, { type: 'answer', text: tableResponse }]);
+        
+        // Cache'e kaydet
+        cache.addQuestion(question, tableResponse, currentSearchResults, "");
+        
+        // Şimdilik işlemi sonlandır, daha fazla API çağrısı yapma
+        setIsLoading(false);
+        setIsAsking(false);
+        scrollToBottom();
+        return;
+      }
+      
+      // GTİP sonucu yoksa normal akışa devam et
+      // İzahname araması ve diğer adımlar
+      const izahnameSearchResults = await searchIzahname(keywords);
       const { results: izahnameResults, context: izahnameContext } = izahnameSearchResults;
       
       // Sonuçları kaydet
@@ -358,18 +393,20 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
       setIsAsking(false);
       setCacheStatus('idle');
     }
-  }, [question, chatHistory, extractKeywords, searchGtip, searchIzahname]);
+  }, [question, chatHistory, extractKeywords, searchGtip, searchIzahname, prepareContextFromResults]);
 
-  // Sonuçlardan bağlam oluştur
+  // Sonuçlardan bağlam oluştur ve tablolaştır
   const prepareContextFromResults = useCallback((gtipResults, izahnameResults, izahnameContext) => {
     let context = '';
     
-    // GTIP verileri
+    // GTIP verileri - Python kodundaki gibi tablo formatında
     if (gtipResults && gtipResults.length > 0) {
       context += "--- GTİP Verileri ---\n";
+      context += "Kod\tTanım\n";
+      context += "-------------------------------\n";
       gtipResults.forEach(item => {
         if (item.Kod && item.Tanım) {
-          context += `Kod: ${item.Kod}, Tanım: ${item.Tanım}\n`;
+          context += `${item.Kod}\t${item.Tanım}\n`;
         }
       });
       context += "\n";
@@ -700,7 +737,7 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
         </div>
       )}
       
-      {/* GTİP Sonuçları */}
+      {/* GTİP Sonuçları - Tablo olarak göster */}
       {searchResults.gtipResults && searchResults.gtipResults.length > 0 && (
         <div style={styles.searchResultsContainer}>
           <div style={styles.searchResultsHeader}>
@@ -708,12 +745,22 @@ const AskAITab = ({ combinedData, isLoading: initialLoading }) => {
             <span>{searchResults.gtipResults.length} sonuç</span>
           </div>
           <div style={styles.searchResultsBody} className="custom-scrollbar">
-            {searchResults.gtipResults.map((item, index) => (
-              <div key={index} style={styles.gtipItem}>
-                <div style={styles.gtipCode}>{item.Kod || ''}</div>
-                <div style={styles.gtipDesc}>{item.Tanım || ''}</div>
-              </div>
-            ))}
+            <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '14px'}}>
+              <thead>
+                <tr style={{backgroundColor: '#f1f5f9', textAlign: 'left'}}>
+                  <th style={{padding: '8px 10px', borderBottom: '1px solid #e2e8f0', width: '150px'}}>Kod</th>
+                  <th style={{padding: '8px 10px', borderBottom: '1px solid #e2e8f0'}}>Tanım</th>
+                </tr>
+              </thead>
+              <tbody>
+                {searchResults.gtipResults.map((item, index) => (
+                  <tr key={index} style={{borderBottom: '1px solid #e2e8f0'}}>
+                    <td style={{padding: '8px 10px', fontWeight: '500'}}>{item.Kod || ''}</td>
+                    <td style={{padding: '8px 10px'}}>{item.Tanım || ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
